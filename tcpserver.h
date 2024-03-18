@@ -10,6 +10,8 @@ class QTcpServer;
 class QTcpSocket;
 
 #include <QObject>
+#include <QVector>
+#include <QMap>
 
 class TcpServer : public QObject
 {
@@ -24,7 +26,7 @@ public slots:
 
 private:
     QTcpServer *server;
-    QTcpSocket *socket;  //创建多个嵌套字以支持多个用户同时在线
+    QMap<QString, QTcpSocket*> map_Socket;  //创建多个嵌套字以支持多个用户同时在线
 };
 
 #endif // TCPSERVER_H

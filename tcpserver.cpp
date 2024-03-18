@@ -16,7 +16,6 @@ TcpServer::TcpServer(QObject *parent)
     : QObject(parent)
 {
     //初始化服务
-    socket = new QTcpSocket(this);
     server = new QTcpServer(this);
 
     server->setMaxPendingConnections(1);  //设置服务端最大连接数
@@ -29,13 +28,17 @@ TcpServer::TcpServer(QObject *parent)
 
 TcpServer::~TcpServer()
 {
-    socket->disconnectFromHost();  //断开与客户端的连接
+    //socket->disconnectFromHost();  //断开与客户端的连接
 }
 
 void TcpServer::onNewConnection()
 {
     while (server->hasPendingConnections()) {
-        socket = server->nextPendingConnection();  //一个连接对应一个嵌套字
+        QTcpSocket *socket = server->nextPendingConnection();  //一个连接对应一个嵌套字
+        QString ip = socket->localAddress().toString();
+        QString port = QString::number(socket->localPort());
+        map_Socket.insert(ip+port, socket);  //ip+port : socket
+
         qDebug() << socket->peerAddress() << socket->peerPort() << "已连接";
 
         //如果有新的消息
