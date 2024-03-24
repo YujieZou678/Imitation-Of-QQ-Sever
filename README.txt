@@ -24,6 +24,20 @@
  1.传输Json数据。
  2.开始使用git管理项目。
  
+ //2024.3.19
+ 1.登陆和注册客户端界面。
+ 
+ //2024.3.22
+ 1.实现登陆界面。
+ 
+ //2024.3.23
+ 1.实现注册界面。
+ 2.实现注册登陆输入格式的检查。
+ 3.上条加上了动画, 并且界面的接口完毕。
+ 
+ //2024.3.24
+ 1.客户端与服务端交互，进行登陆注册的检验。
+ 
  目前正在实现的功能：
  
  1.注册功能。暂时是客户端与服务端1对1。
@@ -33,4 +47,14 @@
  QTextStream, QDataStream; 文本流(文本格式)和数据流(二进制格式)。
  QByteArray: 字节数组。
  QJsonDocument, QJsonObject, QJsonValue。
+ enum: 枚举。用于switch(enum)。
+ 
+ Qml:
+ Layout布局
+ OpacityMask: 扣取图像。
+ TextFiled: 输入框；validator: 限制输入(基于js的正则表达式)。
+ Shape: 划线。
+ CheckBox: 复选框。
+ RadioButton: 单选框。
+ 
  
