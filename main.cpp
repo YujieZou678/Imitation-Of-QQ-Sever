@@ -3,13 +3,16 @@ function: 仿QQ服务端。
 author: zouyujie
 date: 2024.3.18
 */
-#include "tcpserver.h"
+#include "mytcpserver.h"
 
 #include <QApplication>
+#include <QMainWindow>
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    TcpServer w;
+    QMainWindow w;  //窗口是为了完整退出程序
+    w.show();
+    MyTcpServer myTcpServer;
     return a.exec();
 }

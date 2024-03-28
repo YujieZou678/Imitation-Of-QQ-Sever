@@ -10,10 +10,14 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
+    mysubthread.cpp \
+    mythread.cpp \
     tcpserver.cpp
 
 HEADERS += \
-    tcpserver.h
+    mysubthread.h \
+    mytcpserver.h \
+    mythread.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
