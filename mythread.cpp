@@ -11,7 +11,12 @@ date: 2024.3.27
 MyThread::MyThread(QObject *parent) :
     QObject(parent)
 {
-
+    //map_Switch
+    map_Switch = {
+        {"CheckAccountNumber", Purpose::CheckAccountNumber},
+        {"Register", Purpose::Register},
+        {"SingleChat", Purpose::SingleChat}
+    };
 }
 
 MyThread::~MyThread()
@@ -41,7 +46,30 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
 
     //connect
     connect(socket, &QTcpSocket::readyRead, [=](){
-        socket->write(toJson_Message("false"));
+        /* 处理请求 */
+        if (socket->bytesAvailable() <= 0) return;  //字节为空则退出
+        QByteArray data = socket->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QString data_Purpose = doc["Purpose"].toString();
+        enum Purpose purpose = map_Switch[data_Purpose];
+        switch (purpose) {
+        case Purpose::CheckAccountNumber:
+            //调用数据库检验
+            qDebug() << "123";
+            socket->write(info_SendMsg("false"));  //发送存在的信息
+            break;
+        case Purpose::Register:
+            break;
+        case Purpose::SingleChat:
+            QString object = doc["Object"].toString();    //对象
+            QString content = doc["Content"].toString();  //内容
+            if (object == "572211") {
+                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                         << "已发送给"+object;
+                emit toThread2_SendMsg(content);
+            }
+            break;
+        }
     });
     connect(socket, &QTcpSocket::disconnected, [=](){
         socketsMap.remove(ip_port);
@@ -52,7 +80,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
     });
 }
 
-QByteArray MyThread::toJson_Message(const QString &msg)
+QByteArray MyThread::info_SendMsg(const QString &msg)
 {
     QJsonObject json;
     json.insert("Reply", msg);  //目的
@@ -75,4 +103,10 @@ void MyThread::onPrintThreadStart()
 {
     qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
              << "一个子线程已启用。";
+}
+
+void MyThread::onReceiveFromSubThread(const QString &msg)
+{
+    qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+             << msg;
 }

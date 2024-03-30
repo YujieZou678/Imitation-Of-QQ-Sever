@@ -7,7 +7,8 @@ date: 2024.3.18
 #define TCPSERVER_H
 
 #include <QTcpServer>
-#include "mythread.h"
+
+class MyThread;
 
 class MyTcpServer : public QTcpServer
 {
@@ -17,9 +18,9 @@ public:
     MyTcpServer(QTcpServer *parent = nullptr);
     ~MyTcpServer();
 
-    void incomingConnection(qintptr socketDescriptor) override;  //重写
-    void addOneSubThread();  //添加一个子线程
+    void incomingConnection(qintptr socketDescriptor) override;  //重写, 获得socket
     void sendSignalAddByNum(int num, qintptr socketDescriptor);  //发送增加socket的信号
+    void sendSignalPrintByNum(int num);  //发送打印子线程启用的信号
 
 signals:
     void toThread1_PrintThreadStart();
@@ -35,8 +36,8 @@ signals:
     void toThread5_addOneSocket(qintptr socketDescriptor);
 
 private:
-    QVector<QThread*> threads;     //子线程，堆对象
-    QVector<MyThread*> myThreads;  //移入对应子线程的类，堆对象
+    QVector<QThread*> threads;     //容器管理子线程
+    QVector<MyThread*> myThreads;  //移入对应子线程的类
 };
 
 #endif // TCPSERVER_H

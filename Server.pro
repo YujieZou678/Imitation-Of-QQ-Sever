@@ -15,6 +15,7 @@ SOURCES += \
     tcpserver.cpp
 
 HEADERS += \
+    myconfig.h \
     mysubthread.h \
     mytcpserver.h \
     mythread.h
