@@ -6,7 +6,11 @@ date: 2024.3.27
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QThread>
+#include <QThreadPool>
+
 #include "mythread.h"
+#include "mysubthread.h"
+#include "myconfig.h"
 
 MyThread::MyThread(QObject *parent) :
     QObject(parent)
@@ -17,12 +21,17 @@ MyThread::MyThread(QObject *parent) :
         {"Register", Purpose::Register},
         {"SingleChat", Purpose::SingleChat}
     };
+
+    //myThreadPool
+    myThreadPool = QThreadPool::globalInstance();
+    myThreadPool->setMaxThreadCount(10);  //线程池最大线程数
 }
 
 MyThread::~MyThread()
 {
     qDebug() << "主线程" << QThread::currentThread() << ":"
              <<"子线程"+QString::number(ID)+"析构";
+
     QList<QTcpSocket*> sockets = socketsMap.values();
     for (auto socket : sockets) {
         delete socket;
@@ -33,6 +42,7 @@ MyThread::~MyThread()
 void MyThread::addOneSocket(qintptr socketDescriptor)
 {
     socketCount += 1;  //数量加1
+    if (socketCount > SEVER_MAX_CONNECTION/3) emit needCloseListen();
 
     QTcpSocket *socket = new QTcpSocket;
     if (!socket->setSocketDescriptor(socketDescriptor)) {
@@ -53,21 +63,29 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
         QString data_Purpose = doc["Purpose"].toString();
         enum Purpose purpose = map_Switch[data_Purpose];
         switch (purpose) {
-        case Purpose::CheckAccountNumber:
-            //调用数据库检验
-            qDebug() << "123";
-            socket->write(info_SendMsg("false"));  //发送存在的信息
+        case Purpose::CheckAccountNumber: {
+            /* 线程池调用数据库检验 */
+            MySubThread *mySubThread = new MySubThread(socket, doc);
+            connect(mySubThread, &MySubThread::finished_CheckAccountNumber, this, &MyThread::onFinished_CheckAccountNumber);
+            myThreadPool->start(mySubThread);  //线程池会自动释放mySubThread
             break;
-        case Purpose::Register:
+        }
+        case Purpose::Register: {
+            MySubThread *mySubThread = new MySubThread(socket, doc);
+            myThreadPool->start(mySubThread);
             break;
-        case Purpose::SingleChat:
+        }
+        case Purpose::SingleChat: {
             QString object = doc["Object"].toString();    //对象
             QString content = doc["Content"].toString();  //内容
             if (object == "572211") {
                 qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
                          << "已发送给"+object;
-                emit toThread2_SendMsg(content);
+                    emit toThread2_SendMsg(content);
             }
+            break;
+        }
+        default:
             break;
         }
     });
@@ -77,6 +95,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
 
         socketCount -= 1;
         if (socketCount == 0) emit needQuitThread();
+        if (socketCount < SEVER_MAX_CONNECTION/3) emit needOpenListen();
     });
 }
 
@@ -109,4 +128,9 @@ void MyThread::onReceiveFromSubThread(const QString &msg)
 {
     qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
              << msg;
+}
+
+void MyThread::onFinished_CheckAccountNumber(QTcpSocket *socket, const QString &isExit)
+{
+    socket->write(info_SendMsg(isExit));  //发送存在的信息
 }

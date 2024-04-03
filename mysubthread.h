@@ -8,6 +8,8 @@ date: 2024.3.25
 
 #include <QObject>
 #include <QRunnable>
+#include <QJsonDocument>
+#include <QMap>
 #include <QTcpSocket>
 
 class MySubThread : public QObject, public QRunnable
@@ -15,12 +17,27 @@ class MySubThread : public QObject, public QRunnable
     Q_OBJECT
 
 public:
-    MySubThread(QObject *parent = nullptr);
-
+    MySubThread(QTcpSocket *, QJsonDocument doc, QObject *parent = nullptr);
     void run() override;  //重写，子线程执行
 
-private:
+signals:
+    void finished_CheckAccountNumber(QTcpSocket *, QString);  //信号：账号检测完毕
 
+private:
+    enum class Purpose {  //枚举(class内部使用)
+        CheckAccountNumber,
+        Register,
+        SingleChat
+    };
+    QMap<QString, enum Purpose> map_Switch;  //用于寻找信息是哪个目的
+    enum Purpose myPurpose;  //当前任务
+
+    /* 对应的socket */
+    QTcpSocket *socket;
+    /* 账号检测 */
+    QString accountNumber;
+    /* User注册 */
+    QString password;
 };
 
 #endif // MYSUBTHREAD_H

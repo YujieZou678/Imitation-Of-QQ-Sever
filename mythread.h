@@ -9,6 +9,8 @@ date: 2024.3.27
 #include <QObject>
 #include <QTcpSocket>
 
+class QThreadPool;
+
 class MyThread : public QObject
 {
     Q_OBJECT
@@ -27,6 +29,8 @@ public:
 signals:
     /* 子线程与主线程通信 */
     void needQuitThread();  //当管理socket数量为0时需要关闭线程
+    void needCloseListen(); //关闭server监听
+    void needOpenListen();  //打开server监听
 
     /* 子线程间的通信 */
     void toThread2_SendMsg(const QString&);  //给线程2发信息
@@ -34,6 +38,7 @@ signals:
 public slots:
     void onPrintThreadStart();  //打印子线程已启动
     void onReceiveFromSubThread(const QString&);  //接收来自子线程的信息
+    void onFinished_CheckAccountNumber(QTcpSocket *, const QString&);  //接收来自线程池的信息
 
 private:
     enum class Purpose {  //枚举(class内部使用)
@@ -44,6 +49,7 @@ private:
 
     QMap<QString,QTcpSocket*> socketsMap;    //容器管理socket
     QMap<QString, enum Purpose> map_Switch;  //用于寻找信息是哪个目的
+    QThreadPool *myThreadPool;  //获取当前程序的线程池对象
 };
 
 #endif // MYTHREAD_H

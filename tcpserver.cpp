@@ -9,12 +9,12 @@ date: 2024.3.18
 #include "mytcpserver.h"
 #include "mythread.h"
 #include "myconfig.h"
+#include "mydatabase.h"
 
 MyTcpServer::MyTcpServer(QTcpServer *parent)
     : QTcpServer(parent)
 {
     //server配置
-    this->setMaxPendingConnections(SEVER_MAX_CONNECTION);  //设置服务端最大连接数
     if (this->listen(QHostAddress(SEVER_LISTEN_ADDRESS), SEVER_LISTEN_PORT)) {
         qDebug() << "主线程" << QThread::currentThread() << ":"
                  << "Server正在监听"
@@ -22,8 +22,8 @@ MyTcpServer::MyTcpServer(QTcpServer *parent)
                  << this->serverPort();
     }
 
-    //初始化5个子线程, 以及移入的类
-    for (int i=0; i<5; i++) {
+    //初始化3个子线程, 以及移入的类
+    for (int i=0; i<3; i++) {
         QThread *thread = new QThread;
         MyThread *myThread = new MyThread;
         threads.push_back(thread);
@@ -33,7 +33,7 @@ MyTcpServer::MyTcpServer(QTcpServer *parent)
     }
 
     //connect 主线程与子线程 && 子线程与子线程
-    for (int i=0; i<5; i++) {
+    for (int i=0; i<3; i++) {
         /* 子 ---> 主 */
         connect(myThreads[i], &MyThread::needQuitThread, this, [=](){
             threads[i]->quit();
@@ -41,51 +41,54 @@ MyTcpServer::MyTcpServer(QTcpServer *parent)
             qDebug() << "主线程" << QThread::currentThread() << ":"
                      <<"子线程"+QString::number(myThreads[i]->ID)+"已关闭。";
         });
+        connect(myThreads[i], &MyThread::needCloseListen, this, &MyTcpServer::onCloseListen);
+        connect(myThreads[i], &MyThread::needOpenListen, this, &MyTcpServer::onOpenLisen);
         /* 主 ---> 子 */
         switch (myThreads[i]->ID) {
         case 1:
-            connect(this, &MyTcpServer::toThread1_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);  //子线程打印启动信息
-            connect(this, &MyTcpServer::toThread1_addOneSocket, myThreads[i], &MyThread::addOneSocket);  //子线程添加socket管理
-            connect(myThreads[i], &MyThread::toThread2_SendMsg, myThreads[i+1], &MyThread::onReceiveFromSubThread);  //子线程1-->子线程2
+            /* 子线程打印启动信息 */
+            connect(this, &MyTcpServer::toThread1_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
+            /* 子线程添加socket管理 */
+            connect(this, &MyTcpServer::toThread1_addOneSocket, myThreads[i], &MyThread::addOneSocket);
+            /* 子线程1-->子线程2 */
+            connect(myThreads[i], &MyThread::toThread2_SendMsg, myThreads[i+1], &MyThread::onReceiveFromSubThread);
             break;
         case 2:
             connect(this, &MyTcpServer::toThread2_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
             connect(this, &MyTcpServer::toThread2_addOneSocket, myThreads[i], &MyThread::addOneSocket);
-
             break;
         case 3:
             connect(this, &MyTcpServer::toThread3_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
             connect(this, &MyTcpServer::toThread3_addOneSocket, myThreads[i], &MyThread::addOneSocket);
-
-            break;
-        case 4:
-            connect(this, &MyTcpServer::toThread4_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
-            connect(this, &MyTcpServer::toThread4_addOneSocket, myThreads[i], &MyThread::addOneSocket);
-
-            break;
-        case 5:
-            connect(this, &MyTcpServer::toThread5_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
-            connect(this, &MyTcpServer::toThread5_addOneSocket, myThreads[i], &MyThread::addOneSocket);
-
             break;
         default:
             break;
         }
     }
+
+    //数据库的初始化：创建User表, 只在运行时执行一次
+    MyDatabase mydatabase;
+    mydatabase.createUserTable();
 }
 
 MyTcpServer::~MyTcpServer()
 {
     qDebug() << "主线程" << QThread::currentThread() << ":"
              << "主线程析构";
+
     for (auto myThread : myThreads) {  //释放myThreads
-        delete myThread;
-        myThread = nullptr;
+        if (myThread->socketCount == 0) {
+            delete myThread;
+            continue;
+        }
+        myThread->deleteLater();  //不能立刻删除！
     }
 
     for (auto thread : threads) {  //终止所有子线程并释放threads
-        thread->quit();
-        thread->wait();
+        if (thread->isRunning()) {
+            thread->quit();
+            thread->wait();
+        }
         delete thread;
         thread = nullptr;
     }
@@ -130,12 +133,6 @@ void MyTcpServer::sendSignalAddByNum(int num, qintptr socketDescriptor)
     case 3:
         emit toThread3_addOneSocket(socketDescriptor);
         break;
-    case 4:
-        emit toThread4_addOneSocket(socketDescriptor);
-        break;
-    case 5:
-        emit toThread5_addOneSocket(socketDescriptor);
-        break;
     default:
         break;
     }
@@ -153,14 +150,27 @@ void MyTcpServer::sendSignalPrintByNum(int num)
     case 3:
         emit toThread3_PrintThreadStart();
         break;
-    case 4:
-        emit toThread4_PrintThreadStart();
-        break;
-    case 5:
-        emit toThread5_PrintThreadStart();
-        break;
     default:
         break;
+    }
+}
+
+void MyTcpServer::onCloseListen()
+{
+    if (!this->isListening()) return;  //已经没有监听则返回
+    this->close();  //可能有延迟，不能及时响应
+    qDebug() << "主线程" << QThread::currentThread() << ":"
+             << "Server已达最大连接数，暂时关闭。";
+}
+
+void MyTcpServer::onOpenLisen()
+{
+    if (this->isListening()) return;  //已经正在监听则返回
+    if (this->listen(QHostAddress(SEVER_LISTEN_ADDRESS), SEVER_LISTEN_PORT)) {
+        qDebug() << "主线程" << QThread::currentThread() << ":"
+                 << "Server重新监听"
+                 << this->serverAddress()
+                 << this->serverPort();
     }
 }
 

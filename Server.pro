@@ -1,4 +1,4 @@
-QT       += core gui network
+QT       += core gui network sql
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -10,12 +10,14 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
+    mydatabase.cpp \
     mysubthread.cpp \
     mythread.cpp \
     tcpserver.cpp
 
 HEADERS += \
     myconfig.h \
+    mydatabase.h \
     mysubthread.h \
     mytcpserver.h \
     mythread.h
