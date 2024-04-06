@@ -20,7 +20,6 @@ public:
     ~MyThread();
 
     void addOneSocket(qintptr socketDescriptor);  //添加一个socket
-    QByteArray info_SendMsg(const QString&);  //1个字符串转json格式发送
     QString getIp_Port(QTcpSocket*);  //获得一个socket的ip_port
 
     int socketCount{0};   //当前正在管理的socket数量
@@ -38,12 +37,14 @@ signals:
 public slots:
     void onPrintThreadStart();  //打印子线程已启动
     void onReceiveFromSubThread(const QString&);  //接收来自子线程的信息
-    void onFinished_CheckAccountNumber(QTcpSocket *, const QString&);  //接收来自线程池的信息
+    void onFinished_CheckAccountNumber(QTcpSocket *, const QString&);  //接收来自线程池账号检测的信息
+    void onFinished_Login(QTcpSocket *, const QString&);  //接收来自线程池登陆检测的信息
 
 private:
     enum class Purpose {  //枚举(class内部使用)
         CheckAccountNumber,
         Register,
+        Login,
         SingleChat
     };
 

@@ -15,6 +15,7 @@ MySubThread::MySubThread(QTcpSocket *_socket, QJsonDocument doc, QObject *parent
     map_Switch = {
         {"CheckAccountNumber", Purpose::CheckAccountNumber},
         {"Register", Purpose::Register},
+        {"Login", Purpose::Login},
         {"SingleChat", Purpose::SingleChat}
     };
 
@@ -32,6 +33,11 @@ MySubThread::MySubThread(QTcpSocket *_socket, QJsonDocument doc, QObject *parent
         break;
     }
     case Purpose::Register: {
+        accountNumber = doc["AccountNumber"].toString();
+        password = doc["Password"].toString();
+        break;
+    }
+    case Purpose::Login: {
         accountNumber = doc["AccountNumber"].toString();
         password = doc["Password"].toString();
         break;
@@ -57,6 +63,14 @@ void MySubThread::run()
         myDatabase.addUser(accountNumber, password);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "用户注册完毕。";
+        break;
+    }
+    case Purpose::Login: {
+        MyDatabase myDatabase;
+        QString isRight = myDatabase.checkLogin(accountNumber, password);
+        emit finished_Login(socket, isRight);
+        qDebug() << "线程池" << QThread::currentThread() << ":"
+                 << "登陆检测完毕。";
         break;
     }
     default:

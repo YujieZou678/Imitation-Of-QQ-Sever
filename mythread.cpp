@@ -19,6 +19,7 @@ MyThread::MyThread(QObject *parent) :
     map_Switch = {
         {"CheckAccountNumber", Purpose::CheckAccountNumber},
         {"Register", Purpose::Register},
+        {"Login", Purpose::Login},
         {"SingleChat", Purpose::SingleChat}
     };
 
@@ -75,6 +76,12 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             myThreadPool->start(mySubThread);
             break;
         }
+        case Purpose::Login: {
+            MySubThread *mySubThread = new MySubThread(socket, doc);
+            connect(mySubThread, &MySubThread::finished_Login, this, &MyThread::onFinished_Login);
+            myThreadPool->start(mySubThread);
+            break;
+        }
         case Purpose::SingleChat: {
             QString object = doc["Object"].toString();    //对象
             QString content = doc["Content"].toString();  //内容
@@ -97,16 +104,6 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
         if (socketCount == 0) emit needQuitThread();
         if (socketCount < SEVER_MAX_CONNECTION/3) emit needOpenListen();
     });
-}
-
-QByteArray MyThread::info_SendMsg(const QString &msg)
-{
-    QJsonObject json;
-    json.insert("Reply", msg);  //目的
-    QJsonDocument doc(json);
-    QByteArray data = doc.toJson();
-
-    return data;
 }
 
 QString MyThread::getIp_Port(QTcpSocket *socket)
@@ -132,5 +129,22 @@ void MyThread::onReceiveFromSubThread(const QString &msg)
 
 void MyThread::onFinished_CheckAccountNumber(QTcpSocket *socket, const QString &isExit)
 {
-    socket->write(info_SendMsg(isExit));  //发送存在的信息
+    QJsonObject json;
+    json.insert("Purpose", "CheckAccountNumber");  //目的
+    json.insert("Reply", isExit);  //回复
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    socket->write(data);  //发送存在的信息
+}
+
+void MyThread::onFinished_Login(QTcpSocket *socket, const QString &isRight)
+{
+    QJsonObject json;
+    json.insert("Purpose", "Login");  //目的
+    json.insert("Reply", isRight);  //回复
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    socket->write(data);  //发送存在的信息
 }

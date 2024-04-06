@@ -59,3 +59,18 @@ void MyDatabase::addUser(const QString &accountNumber, const QString &password)
         return;
     }
 }
+
+QString MyDatabase::checkLogin(const QString &accountNumber, const QString &password)
+{
+    QSqlQuery query(db);
+    query.prepare("select Password from User where AccountNumber = :accountNumber");
+    query.bindValue(":accountNumber", accountNumber);
+    bool ok = query.exec();
+    if (!ok) {
+        qDebug() << "Query checkLogin failed:" << query.lastError().text();
+    }
+    if (query.next()) {
+        if (query.value(0) == password) return "true";
+    }
+    return "false";
+}

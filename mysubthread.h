@@ -22,11 +22,13 @@ public:
 
 signals:
     void finished_CheckAccountNumber(QTcpSocket *, QString);  //信号：账号检测完毕
+    void finished_Login(QTcpSocket *, QString);  //信号：登陆检测完毕
 
 private:
     enum class Purpose {  //枚举(class内部使用)
         CheckAccountNumber,
         Register,
+        Login,
         SingleChat
     };
     QMap<QString, enum Purpose> map_Switch;  //用于寻找信息是哪个目的
