@@ -8,7 +8,7 @@ date: 2024.3.25
 #include "mysubthread.h"
 #include "mydatabase.h"
 
-MySubThread::MySubThread(QTcpSocket *_socket, QJsonDocument doc, QObject *parent) :
+MySubThread::MySubThread(MySocket *_socket, QJsonDocument doc, QObject *parent) :
     QObject(parent)
 {
     //map_Switch

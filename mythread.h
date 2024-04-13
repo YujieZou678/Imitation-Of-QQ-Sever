@@ -7,9 +7,10 @@ date: 2024.3.27
 #define MYTHREAD_H
 
 #include <QObject>
-#include <QTcpSocket>
+#include "mysocket.h"
 
 class QThreadPool;
+class QSettings;
 
 class MyThread : public QObject
 {
@@ -20,7 +21,9 @@ public:
     ~MyThread();
 
     void addOneSocket(qintptr socketDescriptor);  //添加一个socket
-    QString getIp_Port(QTcpSocket*);  //获得一个socket的ip_port
+    QString getIp_Port(MySocket*);  //获得一个socket的ip_port
+    void savePersonlInfo(const QJsonDocument&, const QByteArray&);  //缓存个人信息
+    QByteArray getProfileImage();  //获取头像
 
     int socketCount{0};   //当前正在管理的socket数量
     int ID;  //属于第几个线程
@@ -37,20 +40,24 @@ signals:
 public slots:
     void onPrintThreadStart();  //打印子线程已启动
     void onReceiveFromSubThread(const QString&);  //接收来自子线程的信息
-    void onFinished_CheckAccountNumber(QTcpSocket *, const QString&);  //接收来自线程池账号检测的信息
-    void onFinished_Login(QTcpSocket *, const QString&);  //接收来自线程池登陆检测的信息
+    void onFinished_CheckAccountNumber(MySocket *, const QString&);  //接收来自线程池账号检测的信息
+    void onFinished_Login(MySocket *, const QString&);  //接收来自线程池登陆检测的信息
+    void onFinished_PrepareSendFile(MySocket *socket);  //返回发送文件的信息
+    void onFinished_SendFile(MySocket *socket);  //返回接收文件完成
 
 private:
     enum class Purpose {  //枚举(class内部使用)
         CheckAccountNumber,
         Register,
         Login,
+        PrepareSendFile,
         SingleChat
     };
 
-    QMap<QString,QTcpSocket*> socketsMap;    //容器管理socket
+    QMap<QString,MySocket*> socketsMap;    //容器管理socket
     QMap<QString, enum Purpose> map_Switch;  //用于寻找信息是哪个目的
     QThreadPool *myThreadPool;  //获取当前程序的线程池对象
+    QSettings *settings;  //缓存数据对象
 };
 
 #endif // MYTHREAD_H

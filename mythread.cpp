@@ -7,6 +7,8 @@ date: 2024.3.27
 #include <QJsonObject>
 #include <QThread>
 #include <QThreadPool>
+#include <QImage>
+#include <QSettings>
 
 #include "mythread.h"
 #include "mysubthread.h"
@@ -20,12 +22,16 @@ MyThread::MyThread(QObject *parent) :
         {"CheckAccountNumber", Purpose::CheckAccountNumber},
         {"Register", Purpose::Register},
         {"Login", Purpose::Login},
+        {"PrepareSendFile", Purpose::PrepareSendFile},
         {"SingleChat", Purpose::SingleChat}
     };
 
     //myThreadPool
     myThreadPool = QThreadPool::globalInstance();
     myThreadPool->setMaxThreadCount(10);  //线程池最大线程数
+
+    //settings
+    settings = new QSettings("config/local.ini", QSettings::NativeFormat, this);
 }
 
 MyThread::~MyThread()
@@ -33,7 +39,7 @@ MyThread::~MyThread()
     qDebug() << "主线程" << QThread::currentThread() << ":"
              <<"子线程"+QString::number(ID)+"析构";
 
-    QList<QTcpSocket*> sockets = socketsMap.values();
+    QList<MySocket*> sockets = socketsMap.values();
     for (auto socket : sockets) {
         delete socket;
         socket = nullptr;
@@ -45,7 +51,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
     socketCount += 1;  //数量加1
     if (socketCount > SEVER_MAX_CONNECTION/3) emit needCloseListen();
 
-    QTcpSocket *socket = new QTcpSocket;
+    MySocket *socket = new MySocket;
     if (!socket->setSocketDescriptor(socketDescriptor)) {
         qDebug() << "socket->setSocketDescriptor(socketDescriptor) failed!";
         return;
@@ -56,12 +62,36 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
     socketsMap.insert(ip_port, socket);
 
     //connect
-    connect(socket, &QTcpSocket::readyRead, [=](){
+    connect(socket, &MySocket::readyRead, [=](){
+        if (socket->ifNeedReceiveFile) {
+            /* 开始接收文件 */
+            socket->count += 1;
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "开始接收文件 次数"+QString::number(socket->count);
+            QByteArray data = QByteArray::fromBase64(socket->readAll());
+            socket->file.append(data);
+            socket->receiveSize += data.size();
+
+            if (socket->fileSize <= socket->receiveSize) {  //文件接收完毕
+                QJsonObject json;
+                json.insert("ID", socket->ID);
+                QJsonDocument doc(json);
+                savePersonlInfo(doc, socket->file);
+
+                socket->ifNeedReceiveFile = false;
+                onFinished_SendFile(socket);  //回应接收完毕
+                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                         << "文件接收完毕。";
+            }
+            return;
+        }
+
         /* 处理请求 */
         if (socket->bytesAvailable() <= 0) return;  //字节为空则退出
         QByteArray data = socket->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QString data_Purpose = doc["Purpose"].toString();
+        if (data_Purpose == "") { qDebug() << "传输文件过大，没能一次性传输！"; return; }
         enum Purpose purpose = map_Switch[data_Purpose];
         switch (purpose) {
         case Purpose::CheckAccountNumber: {
@@ -82,6 +112,20 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             myThreadPool->start(mySubThread);
             break;
         }
+        case Purpose::PrepareSendFile: {
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "准备接收文件。";
+            /* 初始化文件数据 */
+            socket->fileSize = doc["FileSize"].toInt();
+            socket->ID = doc["ID"].toString();
+            socket->file.clear();
+            socket->receiveSize = 0;
+            socket->count = 0;
+            socket->ifNeedReceiveFile = true;  //该socket下个传输为文件
+
+            onFinished_PrepareSendFile(socket);  //回应准备接收文件
+            break;
+        }
         case Purpose::SingleChat: {
             QString object = doc["Object"].toString();    //对象
             QString content = doc["Content"].toString();  //内容
@@ -96,7 +140,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             break;
         }
     });
-    connect(socket, &QTcpSocket::disconnected, [=](){
+    connect(socket, &MySocket::disconnected, [=](){
         socketsMap.remove(ip_port);
         socket->deleteLater();  //不能立刻删除!!!
 
@@ -106,13 +150,32 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
     });
 }
 
-QString MyThread::getIp_Port(QTcpSocket *socket)
+QString MyThread::getIp_Port(MySocket *socket)
 {
     QString ip = socket->peerAddress().toString();
     QString port = QString::number(socket->peerPort());
     QString ip_port = ip+":"+port;
 
     return ip_port;
+}
+
+void MyThread::savePersonlInfo(const QJsonDocument &doc, const QByteArray &data)
+{
+    QString ID = doc["ID"].toString();  //qq号
+    settings->setValue(ID+"/ProfileImage", data);
+}
+
+QByteArray MyThread::getProfileImage()
+{
+    settings->beginGroup("2894841947");  //进入目录
+    QByteArray data = settings->value("ProfileImage").toByteArray();
+    settings->endGroup();  //退出目录
+
+//    QImage image;
+//    image.loadFromData(data, "PNG");
+//    image.save("/root/my_test/Server/test.png", "PNG");  //保存该文件
+
+    return data;
 }
 
 void MyThread::onPrintThreadStart()
@@ -127,7 +190,7 @@ void MyThread::onReceiveFromSubThread(const QString &msg)
              << msg;
 }
 
-void MyThread::onFinished_CheckAccountNumber(QTcpSocket *socket, const QString &isExit)
+void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QString &isExit)
 {
     QJsonObject json;
     json.insert("Purpose", "CheckAccountNumber");  //目的
@@ -138,11 +201,33 @@ void MyThread::onFinished_CheckAccountNumber(QTcpSocket *socket, const QString &
     socket->write(data);  //发送存在的信息
 }
 
-void MyThread::onFinished_Login(QTcpSocket *socket, const QString &isRight)
+void MyThread::onFinished_Login(MySocket *socket, const QString &isRight)
 {
     QJsonObject json;
     json.insert("Purpose", "Login");  //目的
     json.insert("Reply", isRight);  //回复
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    socket->write(data);  //发送存在的信息
+}
+
+void MyThread::onFinished_PrepareSendFile(MySocket *socket)
+{
+    QJsonObject json;
+    json.insert("Purpose", "PrepareSendFile");  //目的
+    json.insert("Reply", "true");  //回复
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    socket->write(data);  //发送存在的信息
+}
+
+void MyThread::onFinished_SendFile(MySocket *socket)
+{
+    QJsonObject json;
+    json.insert("Purpose", "SendFile");  //目的
+    json.insert("Reply", "true");  //回复
     QJsonDocument doc(json);
     QByteArray data = doc.toJson();
 

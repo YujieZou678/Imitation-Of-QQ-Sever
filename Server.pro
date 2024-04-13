@@ -11,6 +11,7 @@ CONFIG += c++17
 SOURCES += \
     main.cpp \
     mydatabase.cpp \
+    mysocket.cpp \
     mysubthread.cpp \
     mythread.cpp \
     tcpserver.cpp
@@ -18,6 +19,7 @@ SOURCES += \
 HEADERS += \
     myconfig.h \
     mydatabase.h \
+    mysocket.h \
     mysubthread.h \
     mytcpserver.h \
     mythread.h

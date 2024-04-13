@@ -10,19 +10,19 @@ date: 2024.3.25
 #include <QRunnable>
 #include <QJsonDocument>
 #include <QMap>
-#include <QTcpSocket>
+#include "mysocket.h"
 
 class MySubThread : public QObject, public QRunnable
 {
     Q_OBJECT
 
 public:
-    MySubThread(QTcpSocket *, QJsonDocument doc, QObject *parent = nullptr);
+    MySubThread(MySocket *, QJsonDocument doc, QObject *parent = nullptr);
     void run() override;  //重写，子线程执行
 
 signals:
-    void finished_CheckAccountNumber(QTcpSocket *, QString);  //信号：账号检测完毕
-    void finished_Login(QTcpSocket *, QString);  //信号：登陆检测完毕
+    void finished_CheckAccountNumber(MySocket *, QString);  //信号：账号检测完毕
+    void finished_Login(MySocket *, QString);  //信号：登陆检测完毕
 
 private:
     enum class Purpose {  //枚举(class内部使用)
@@ -35,7 +35,7 @@ private:
     enum Purpose myPurpose;  //当前任务
 
     /* 对应的socket */
-    QTcpSocket *socket;
+    MySocket *socket;
     /* 账号检测 */
     QString accountNumber;
     /* User注册 */
