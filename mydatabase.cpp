@@ -1,13 +1,28 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QThread>
+#include <QRandomGenerator>
 
 #include "mydatabase.h"
 
 MyDatabase::MyDatabase()
 {
+    /* 获取一个独一无二的连接名 */
+    int randomData;
+    QStringList nameList = QSqlDatabase::connectionNames();  //目前所有连接名(有即正在使用)
+    bool needGetAgain = false;  //是否需要重新生成随机数
+    while (1) {
+        QRandomGenerator randomSeed = QRandomGenerator::securelySeeded();  //使用当前时间作为随机种子
+        randomData = randomSeed.bounded(0, 100);  //随机数: 0-99
+        for (auto name : nameList) {
+            if (name == QString::number(randomData)) { needGetAgain = true; break; }  //重新生成随机数
+        }
+        if (needGetAgain) { needGetAgain = false; continue; }
+        break;
+    }
+
     //初始化db
-    db = QSqlDatabase::addDatabase("QSQLITE");
+    db = QSqlDatabase::addDatabase("QSQLITE", QString::number(randomData));  //需要创建一个目前没有的连接名
     db.setDatabaseName("myDatabase.db");
     if (!db.open()) {
         qDebug() << "DB open failed:" << db.lastError().text();

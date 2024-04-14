@@ -1,3 +1,8 @@
+/*
+function: 重写socket。
+author: zouyujie
+date: 2024.4.14
+*/
 #ifndef MYSOCKET_H
 #define MYSOCKET_H
 

@@ -64,24 +64,25 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
     //connect
     connect(socket, &MySocket::readyRead, [=](){
         if (socket->ifNeedReceiveFile) {
-            /* 开始接收文件 */
+            /* 开始接收头像文件 */
             socket->count += 1;
-            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-                     << "开始接收文件 次数"+QString::number(socket->count);
-            QByteArray data = QByteArray::fromBase64(socket->readAll());
+            //QByteArray data = QByteArray::fromBase64(socket->readAll());
+            QByteArray data = socket->readAll();
             socket->file.append(data);
             socket->receiveSize += data.size();
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "开始接收图像文件 次数"+QString::number(socket->count)+" "+QString::number(socket->receiveSize);
 
-            if (socket->fileSize <= socket->receiveSize) {  //文件接收完毕
+            if (socket->fileSize <= socket->receiveSize) {  //图像文件接收完毕
                 QJsonObject json;
                 json.insert("ID", socket->ID);
                 QJsonDocument doc(json);
-                savePersonlInfo(doc, socket->file);
+                savePersonlInfo(doc, socket->file);  //保存个人信息
 
                 socket->ifNeedReceiveFile = false;
                 onFinished_SendFile(socket);  //回应接收完毕
                 qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-                         << "文件接收完毕。";
+                         << "图像文件接收完毕。";
             }
             return;
         }
@@ -113,10 +114,10 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             break;
         }
         case Purpose::PrepareSendFile: {
-            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-                     << "准备接收文件。";
             /* 初始化文件数据 */
             socket->fileSize = doc["FileSize"].toInt();
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "准备接收图像文件 大小："+QString::number(socket->fileSize);
             socket->ID = doc["ID"].toString();
             socket->file.clear();
             socket->receiveSize = 0;
@@ -162,7 +163,7 @@ QString MyThread::getIp_Port(MySocket *socket)
 void MyThread::savePersonlInfo(const QJsonDocument &doc, const QByteArray &data)
 {
     QString ID = doc["ID"].toString();  //qq号
-    settings->setValue(ID+"/ProfileImage", data);
+    if (!data.isEmpty()) settings->setValue(ID+"/ProfileImage", data);
 }
 
 QByteArray MyThread::getProfileImage()

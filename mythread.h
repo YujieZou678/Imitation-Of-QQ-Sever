@@ -22,7 +22,7 @@ public:
 
     void addOneSocket(qintptr socketDescriptor);  //添加一个socket
     QString getIp_Port(MySocket*);  //获得一个socket的ip_port
-    void savePersonlInfo(const QJsonDocument&, const QByteArray&);  //缓存个人信息
+    void savePersonlInfo(const QJsonDocument&, const QByteArray&data);  //缓存个人信息
     QByteArray getProfileImage();  //获取头像
 
     int socketCount{0};   //当前正在管理的socket数量
