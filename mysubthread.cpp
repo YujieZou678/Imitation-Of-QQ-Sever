@@ -4,6 +4,8 @@ author: zouyujie
 date: 2024.3.25
 */
 #include <QThread>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include "mysubthread.h"
 #include "mydatabase.h"
@@ -54,7 +56,12 @@ void MySubThread::run()
     case Purpose::CheckAccountNumber: {
         MyDatabase myDatabase;
         QString isExit = myDatabase.checkAccountNumber(accountNumber);
-        emit finished_CheckAccountNumber(socket, check, isExit);
+        QJsonObject json;
+        json.insert("Check", check);
+        json.insert("Reply", isExit);
+        json.insert("AccountNumber", accountNumber);
+        QJsonDocument doc(json);
+        emit finished_CheckAccountNumber(socket, doc);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "账号检测完毕。";
         break;

@@ -7,6 +7,7 @@ date: 2024.3.27
 #define MYTHREAD_H
 
 #include <QObject>
+#include <QJsonDocument>
 #include "mysocket.h"
 
 class QThreadPool;
@@ -23,8 +24,8 @@ public:
     void addOneSocket(qintptr socketDescriptor);              //添加一个socket
     QString getIp_Port(MySocket*);                            //获得一个socket的ip_port
     void savePersonlInfo(const QJsonDocument&, const QByteArray&data, qintptr);  //缓存个人信息
-    QByteArray getProfileImageData();                         //获取头像数据
-    int getProfileImageSize();                                //获取头像大小
+    QByteArray getProfileImageData(const QString&);                         //获取头像数据
+    int getProfileImageSize(const QString&);                                //获取头像大小
     void startSendFile(MySocket *, const QByteArray &_data);  //开始传输文件
 
     int socketCount{0};   //当前正在管理的socket数量
@@ -41,7 +42,7 @@ signals:
 
 public slots:
     void onPrintThreadStart();                           //打印"子线程已启动"
-    void onFinished_CheckAccountNumber(MySocket *, const QString &, const QString &);  //账号检测完毕
+    void onFinished_CheckAccountNumber(MySocket *, const QJsonDocument&);  //账号检测完毕
     void onFinished_Login(MySocket *, const QString &);  //登陆检测完毕
     void onFinished_PrepareSendFile(MySocket *socket);   //返回发送文件的信息
     void onFinished_SendFile(MySocket *socket);          //返回接收文件完成

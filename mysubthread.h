@@ -21,7 +21,7 @@ public:
     void run() override;  //重写，子线程执行
 
 signals:
-    void finished_CheckAccountNumber(MySocket *, const QString & ,const QString &);  //账号检测完毕
+    void finished_CheckAccountNumber(MySocket *, const QJsonDocument&);  //账号检测完毕
     void finished_Login(MySocket *, const QString &);                                //登陆检测完毕
 
 private:

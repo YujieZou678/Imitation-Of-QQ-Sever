@@ -3,7 +3,6 @@ function: 子线程。用于管理并监听主线程分下来socket。
 author: zouyujie
 date: 2024.3.27
 */
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QThread>
 #include <QThreadPool>
@@ -76,7 +75,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
 
             if (socket->fileSize <= socket->receiveSize) {  //图像文件接收完毕
                 QJsonObject json;
-                json.insert("ID", socket->ID);
+                json.insert("AccountNumber", socket->accountNumber);
                 QJsonDocument doc(json);
                 savePersonlInfo(doc, socket->file, socket->fileSize);  //保存图像文件
 
@@ -119,7 +118,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             socket->fileSize = doc["FileSize"].toInt();
             qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
                      << "准备接收图像文件 大小："+QString::number(socket->fileSize);
-            socket->ID = doc["ID"].toString();
+            socket->accountNumber = doc["AccountNumber"].toString();
             socket->file.clear();
             socket->receiveSize = 0;
             socket->count = 0;
@@ -134,7 +133,8 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
                 /* 开始发送文件 */
                 qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
                          << "开始发送文件";
-                QByteArray data = getProfileImageData();
+                QString accountNumber = doc["AccountNumber"].toString();
+                QByteArray data = getProfileImageData(accountNumber);
                 startSendFile(socket, data);
             }
             break;
@@ -174,14 +174,14 @@ QString MyThread::getIp_Port(MySocket *socket)
 
 void MyThread::savePersonlInfo(const QJsonDocument &doc, const QByteArray &data, qintptr size)
 {
-    QString ID = doc["ID"].toString();  //qq号
-    settings->setValue(ID+"/ProfileImage/Size", size);  //存入大小
-    if (!data.isEmpty()) settings->setValue(ID+"/ProfileImage/Data", data);  //存入数据
+    QString accountNumber = doc["AccountNumber"].toString();       //账号
+    settings->setValue(accountNumber+"/ProfileImage/Size", size);  //存入大小
+    if (!data.isEmpty()) settings->setValue(accountNumber+"/ProfileImage/Data", data);  //存入数据
 }
 
-QByteArray MyThread::getProfileImageData()
+QByteArray MyThread::getProfileImageData(const QString &accountNumber)
 {
-    settings->beginGroup("2894841947");  //进入目录
+    settings->beginGroup(accountNumber);   //进入目录
     settings->beginGroup("ProfileImage");  //进入目录
     QByteArray data = settings->value("Data").toByteArray();  //获取文件数据
     settings->endGroup();  //退出目录
@@ -190,9 +190,9 @@ QByteArray MyThread::getProfileImageData()
     return data;
 }
 
-int MyThread::getProfileImageSize()
+int MyThread::getProfileImageSize(const QString &accountNumber)
 {
-    settings->beginGroup("2894841947");  //进入目录
+    settings->beginGroup(accountNumber);  //进入目录
     settings->beginGroup("ProfileImage");  //进入目录
     int size = settings->value("Size").toInt();  //获取文件数据大小
     settings->endGroup();  //退出目录
@@ -246,17 +246,21 @@ void MyThread::onReceiveFromSubThread(const QString &msg)
              << msg;
 }
 
-void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QString &check, const QString &isExit)
+void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocument &_doc)
 {
+    QString accountNumber = _doc["AccountNumber"].toString();
+    QString check = _doc["Check"].toString();
+    QString isExit = _doc["Reply"].toString();
+
     QJsonObject json;
     json.insert("Purpose", "CheckAccountNumber");  //目的
     json.insert("Check", check);
     json.insert("Reply", isExit);  //回复
 
     if (check == "Login") {  //用于登陆
-        qint64 fileSize = getProfileImageSize();  //文件大小
+        qint64 fileSize = getProfileImageSize(accountNumber);  //文件大小
         json.insert("FileSize", fileSize);
-        json.insert("ID", "2894841947");
+        json.insert("AccountNumber", accountNumber);
     }
 
     QJsonDocument doc(json);
