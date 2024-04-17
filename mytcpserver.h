@@ -1,5 +1,5 @@
 ﻿/*
-function: 主线程。
+function: 服务端：主线程。
 author: zouyujie
 date: 2024.3.18
 */
@@ -18,9 +18,9 @@ public:
     MyTcpServer(QTcpServer *parent = nullptr);
     ~MyTcpServer();
 
-    void incomingConnection(qintptr socketDescriptor) override;  //重写, 获得socket
+    void incomingConnection(qintptr socketDescriptor) override;  //重写, 分配socket给子线程
     void sendSignalAddByNum(int num, qintptr socketDescriptor);  //发送增加socket的信号
-    void sendSignalPrintByNum(int num);  //发送打印子线程启用的信号
+    void sendSignalPrintByNum(int num);                          //发送打印子线程启用的信号
 
 signals:
     void toAllSubThread_Disconnect();  //断开与客户端连接
@@ -38,9 +38,8 @@ public slots:
     void onOpenLisen();    //打开监听
 
 private:
-    QVector<QThread*> threads;     //容器管理子线程
-    QVector<MyThread*> myThreads;  //移入对应子线程的类
-    int count{0};
+    QVector<QThread*> threads;
+    QVector<MyThread*> myThreads;  //子线程们
 };
 
 #endif // TCPSERVER_H

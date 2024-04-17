@@ -21,8 +21,8 @@ public:
     void run() override;  //重写，子线程执行
 
 signals:
-    void finished_CheckAccountNumber(MySocket *, QString);  //信号：账号检测完毕
-    void finished_Login(MySocket *, QString);  //信号：登陆检测完毕
+    void finished_CheckAccountNumber(MySocket *, const QString & ,const QString &);  //账号检测完毕
+    void finished_Login(MySocket *, const QString &);                                //登陆检测完毕
 
 private:
     enum class Purpose {  //枚举(class内部使用)
@@ -38,6 +38,7 @@ private:
     MySocket *socket;
     /* 账号检测 */
     QString accountNumber;
+    QString check;  //用于判断是登陆or注册
     /* User注册 */
     QString password;
 };

@@ -11,7 +11,7 @@ date: 2024.4.14
 class MySocket : public QTcpSocket
 {
 public:
-    MySocket(QTcpSocket *parent = nullptr);
+    MySocket(QObject *parent = nullptr);
     ~MySocket();
 
     bool ifNeedReceiveFile{false};  //是否需要接收文件

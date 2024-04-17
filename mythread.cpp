@@ -23,6 +23,7 @@ MyThread::MyThread(QObject *parent) :
         {"Register", Purpose::Register},
         {"Login", Purpose::Login},
         {"PrepareSendFile", Purpose::PrepareSendFile},
+        {"ReceiveFile", Purpose::ReceiveFile},
         {"SingleChat", Purpose::SingleChat}
     };
 
@@ -77,7 +78,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
                 QJsonObject json;
                 json.insert("ID", socket->ID);
                 QJsonDocument doc(json);
-                savePersonlInfo(doc, socket->file);  //保存个人信息
+                savePersonlInfo(doc, socket->file, socket->fileSize);  //保存图像文件
 
                 socket->ifNeedReceiveFile = false;
                 onFinished_SendFile(socket);  //回应接收完毕
@@ -127,6 +128,17 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             onFinished_PrepareSendFile(socket);  //回应准备接收文件
             break;
         }
+        case Purpose::ReceiveFile: {
+            QString reply = doc["Reply"].toString();  //得到答复
+            if (reply == "true") {
+                /* 开始发送文件 */
+                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                         << "开始发送文件";
+                QByteArray data = getProfileImageData();
+                startSendFile(socket, data);
+            }
+            break;
+        }
         case Purpose::SingleChat: {
             QString object = doc["Object"].toString();    //对象
             QString content = doc["Content"].toString();  //内容
@@ -160,23 +172,66 @@ QString MyThread::getIp_Port(MySocket *socket)
     return ip_port;
 }
 
-void MyThread::savePersonlInfo(const QJsonDocument &doc, const QByteArray &data)
+void MyThread::savePersonlInfo(const QJsonDocument &doc, const QByteArray &data, qintptr size)
 {
     QString ID = doc["ID"].toString();  //qq号
-    if (!data.isEmpty()) settings->setValue(ID+"/ProfileImage", data);
+    settings->setValue(ID+"/ProfileImage/Size", size);  //存入大小
+    if (!data.isEmpty()) settings->setValue(ID+"/ProfileImage/Data", data);  //存入数据
 }
 
-QByteArray MyThread::getProfileImage()
+QByteArray MyThread::getProfileImageData()
 {
     settings->beginGroup("2894841947");  //进入目录
-    QByteArray data = settings->value("ProfileImage").toByteArray();
+    settings->beginGroup("ProfileImage");  //进入目录
+    QByteArray data = settings->value("Data").toByteArray();  //获取文件数据
+    settings->endGroup();  //退出目录
     settings->endGroup();  //退出目录
 
-//    QImage image;
-//    image.loadFromData(data, "PNG");
-//    image.save("/root/my_test/Server/test.png", "PNG");  //保存该文件
-
     return data;
+}
+
+int MyThread::getProfileImageSize()
+{
+    settings->beginGroup("2894841947");  //进入目录
+    settings->beginGroup("ProfileImage");  //进入目录
+    int size = settings->value("Size").toInt();  //获取文件数据大小
+    settings->endGroup();  //退出目录
+    settings->endGroup();  //退出目录
+
+    return size;
+}
+
+void MyThread::startSendFile(MySocket *socket, const QByteArray &_data)
+{
+    qintptr oneSend_Size = 4000000;  //一次最大传输:四百万
+    if (_data.size() < oneSend_Size) {  //一次性传输
+        qintptr fileSize = socket->write(_data);
+        socket->flush();  //立刻传输
+        qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                 << "图像文件发送完毕 大小："+QString::number(fileSize);
+    }
+    else {  //多次传输
+        qintptr hadSend_Size = 0;  //已经传输的大小
+        for (int i=0; i<1000; i++) {
+            if (hadSend_Size >= _data.size()) {  //检测是否发送完毕
+                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                         << "图像文件发送完毕 大小："+QString::number(hadSend_Size);
+                break;
+            }
+
+            QByteArray data;
+            if (_data.size()-hadSend_Size < oneSend_Size) {  //最后一次字节不够
+                data = _data.last(_data.size()-hadSend_Size);
+            } else {
+                data = _data.sliced(hadSend_Size, oneSend_Size);
+            }
+            qintptr oneWrite_Size = socket->write(data);
+            socket->flush();  //立刻传输
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "图像文件第"+QString::number(i+1)+"次发送 大小："+QString::number(oneWrite_Size);
+                            hadSend_Size += oneWrite_Size;
+        }
+    }
 }
 
 void MyThread::onPrintThreadStart()
@@ -191,14 +246,21 @@ void MyThread::onReceiveFromSubThread(const QString &msg)
              << msg;
 }
 
-void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QString &isExit)
+void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QString &check, const QString &isExit)
 {
     QJsonObject json;
     json.insert("Purpose", "CheckAccountNumber");  //目的
+    json.insert("Check", check);
     json.insert("Reply", isExit);  //回复
+
+    if (check == "Login") {  //用于登陆
+        qint64 fileSize = getProfileImageSize();  //文件大小
+        json.insert("FileSize", fileSize);
+        json.insert("ID", "2894841947");
+    }
+
     QJsonDocument doc(json);
     QByteArray data = doc.toJson();
-
     socket->write(data);  //发送存在的信息
 }
 

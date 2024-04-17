@@ -30,6 +30,7 @@ MySubThread::MySubThread(MySocket *_socket, QJsonDocument doc, QObject *parent) 
     switch (myPurpose) {
     case Purpose::CheckAccountNumber: {
         accountNumber = doc["AccountNumber"].toString();
+        check = doc["Check"].toString();
         break;
     }
     case Purpose::Register: {
@@ -53,7 +54,7 @@ void MySubThread::run()
     case Purpose::CheckAccountNumber: {
         MyDatabase myDatabase;
         QString isExit = myDatabase.checkAccountNumber(accountNumber);
-        emit finished_CheckAccountNumber(socket, isExit);
+        emit finished_CheckAccountNumber(socket, check, isExit);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "账号检测完毕。";
         break;

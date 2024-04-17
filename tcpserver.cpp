@@ -1,5 +1,5 @@
 ﻿/*
-function: 主线程。
+function: 服务端：主线程。
 author: zouyujie
 date: 2024.3.18
 */
@@ -29,10 +29,10 @@ MyTcpServer::MyTcpServer(QTcpServer *parent)
         threads.push_back(thread);
         myThreads.push_back(myThread);
         myThread->ID = myThreads.size();  //属于第几个线程
-        myThread->moveToThread(thread);  //绑定
+        myThread->moveToThread(thread);   //绑定
     }
 
-    //connect 主线程与子线程 && 子线程与子线程
+    /* connect 主线程与子线程 && 子线程与子线程 */
     for (int i=0; i<3; i++) {
         /* 子 ---> 主 */
         connect(myThreads[i], &MyThread::needQuitThread, this, [=](){
@@ -81,7 +81,7 @@ MyTcpServer::~MyTcpServer()
             delete myThread;
             continue;
         }
-        myThread->deleteLater();  //不能立刻删除！
+        myThread->deleteLater();  //不能立刻删除！原因：直接删除是主线程去执行，而主线程不能操作子线程的socket
     }
 
     for (auto thread : threads) {  //终止所有子线程并释放threads
