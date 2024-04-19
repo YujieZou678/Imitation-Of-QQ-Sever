@@ -10,7 +10,7 @@ date: 2024.3.25
 #include "mysubthread.h"
 #include "mydatabase.h"
 
-MySubThread::MySubThread(MySocket *_socket, QJsonDocument doc, QObject *parent) :
+MySubThread::MySubThread(MySocket *_socket, QJsonDocument _doc, QObject *parent) :
     QObject(parent)
 {
     //map_Switch
@@ -25,24 +25,24 @@ MySubThread::MySubThread(MySocket *_socket, QJsonDocument doc, QObject *parent) 
     socket = _socket;
 
     //myPurpose
-    QString data_Purpose = doc["Purpose"].toString();
+    QString data_Purpose = _doc["Purpose"].toString();
     myPurpose = map_Switch[data_Purpose];  //初始化myPurpose
 
     //根据对应目标给初始值赋值
     switch (myPurpose) {
     case Purpose::CheckAccountNumber: {
-        accountNumber = doc["AccountNumber"].toString();
-        check = doc["Check"].toString();
+        accountNumber = _doc["AccountNumber"].toString();
+        check = _doc["Check"].toString();
         break;
     }
     case Purpose::Register: {
-        accountNumber = doc["AccountNumber"].toString();
-        password = doc["Password"].toString();
+        accountNumber = _doc["AccountNumber"].toString();
+        password = _doc["Password"].toString();
         break;
     }
     case Purpose::Login: {
-        accountNumber = doc["AccountNumber"].toString();
-        password = doc["Password"].toString();
+        accountNumber = _doc["AccountNumber"].toString();
+        password = _doc["Password"].toString();
         break;
     }
     default:
@@ -60,8 +60,8 @@ void MySubThread::run()
         json.insert("Check", check);
         json.insert("Reply", isExit);
         json.insert("AccountNumber", accountNumber);
-        QJsonDocument doc(json);
-        emit finished_CheckAccountNumber(socket, doc);
+        QJsonDocument _doc(json);
+        emit finished_CheckAccountNumber(socket, _doc);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "账号检测完毕。";
         break;

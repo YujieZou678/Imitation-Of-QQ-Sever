@@ -23,10 +23,12 @@ public:
 
     void addOneSocket(qintptr socketDescriptor);              //添加一个socket
     QString getIp_Port(MySocket*);                            //获得一个socket的ip_port
-    void savePersonlInfo(const QJsonDocument&, const QByteArray&data, qintptr);  //缓存个人信息
+    void saveProfileImage(const QString&, const QByteArray&data, qintptr);  //缓存个人头像
     QByteArray getProfileImageData(const QString&);                         //获取头像数据
     int getProfileImageSize(const QString&);                                //获取头像大小
     void startSendFile(MySocket *, const QByteArray &_data);  //开始传输文件
+    void savePersonalData(const QJsonDocument&);              //缓存个人信息
+    QString getPersonalData(const QString&, const QString&);  //获取个人信息
 
     int socketCount{0};   //当前正在管理的socket数量
     int ID;               //属于第几个线程
@@ -56,6 +58,7 @@ private:
         Login,
         PrepareSendFile,
         ReceiveFile,
+        ChangePersonalData,
         SingleChat
     };
 
