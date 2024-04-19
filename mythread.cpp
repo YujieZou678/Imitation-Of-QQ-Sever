@@ -282,7 +282,7 @@ void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocume
     json.insert("Check", check);
     json.insert("Reply", isExit);  //回复
 
-    if (check == "Login") {  //用于登陆：个人信息 头像文件
+    if (isExit == "true" && check == "Login") {  //账号有效 且 用于登陆：个人信息 头像文件
         QString accountNumber = _doc["AccountNumber"].toString();       //账号
         qint64 fileSize = getProfileImageSize(accountNumber);           //文件大小
         QString NickName = getPersonalData(accountNumber, "NickName");  //昵称
