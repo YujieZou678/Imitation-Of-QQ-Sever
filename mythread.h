@@ -29,6 +29,8 @@ public:
     void startSendFile(MySocket *, const QByteArray &_data);  //开始传输文件
     void savePersonalData(const QJsonDocument&);              //缓存个人信息
     QString getPersonalData(const QString&, const QString&);  //获取个人信息
+    void saveFriendData(const QJsonDocument&);                //缓存好友信息
+    QJsonArray getFriendChatHistory(const QString&, const QString&);//获取聊天记录
 
     int socketCount{0};   //当前正在管理的socket数量
     int ID;               //属于第几个线程
@@ -59,6 +61,7 @@ private:
         PrepareSendFile,
         ReceiveFile,
         ChangePersonalData,
+        AddFriend,
         SingleChat
     };
 

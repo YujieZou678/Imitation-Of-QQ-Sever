@@ -4,6 +4,8 @@ author: zouyujie
 date: 2024.3.27
 */
 #include <QJsonObject>
+#include <QJsonValue>
+#include <QJsonArray>
 #include <QThread>
 #include <QThreadPool>
 #include <QImage>
@@ -24,6 +26,7 @@ MyThread::MyThread(QObject *parent) :
         {"PrepareSendFile", Purpose::PrepareSendFile},
         {"ReceiveFile", Purpose::ReceiveFile},
         {"ChangePersonalData", Purpose::ChangePersonalData},
+        {"AddFriend", Purpose::AddFriend},
         {"SingleChat", Purpose::SingleChat}
     };
 
@@ -144,6 +147,13 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
                      << "个人信息更新完成";
             break;
         }
+        case Purpose::AddFriend: {
+            /* 存入好友信息 */
+            saveFriendData(doc);
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "好友信息存入完成";
+            break;
+        }
         case Purpose::SingleChat: {
             QString object = doc["Object"].toString();    //对象
             QString content = doc["Content"].toString();  //内容
@@ -242,11 +252,16 @@ void MyThread::savePersonalData(const QJsonDocument &doc)
 {
     QString accountNumber = doc["AccountNumber"].toString();
     /* 按账号存储各种信息 */
-    settings->setValue(accountNumber+"/PersonalData/NickName", doc["NickName"].toString());  //昵称
-    settings->setValue(accountNumber+"/PersonalData/Sex", doc["Sex"].toString());            //性别
-    settings->setValue(accountNumber+"/PersonalData/ZodiacSign", doc["ZodiacSign"].toString());//属相
-    settings->setValue(accountNumber+"/PersonalData/BloodGroup", doc["BloodGroup"].toString());//血型
-    settings->setValue(accountNumber+"/PersonalData/PersonalSignature", doc["PersonalSignature"].toString());//个性签名
+    settings->setValue(accountNumber+"/PersonalData/NickName",
+                       doc["NickName"].toString());         //昵称
+    settings->setValue(accountNumber+"/PersonalData/Sex",
+                       doc["Sex"].toString());              //性别
+    settings->setValue(accountNumber+"/PersonalData/ZodiacSign",
+                       doc["ZodiacSign"].toString());       //属相
+    settings->setValue(accountNumber+"/PersonalData/BloodGroup",
+                       doc["BloodGroup"].toString());       //血型
+    settings->setValue(accountNumber+"/PersonalData/PersonalSignature",
+                       doc["PersonalSignature"].toString());//个性签名
 }
 
 QString MyThread::getPersonalData(const QString &accountNumber, const QString &key)
@@ -254,6 +269,33 @@ QString MyThread::getPersonalData(const QString &accountNumber, const QString &k
     settings->beginGroup(accountNumber);   //进入目录
     settings->beginGroup("PersonalData");  //进入目录
     QString data = settings->value(key).toString();  //获取个人信息key对应的值
+    settings->endGroup();  //退出目录
+    settings->endGroup();  //退出目录
+
+    return data;
+}
+
+void MyThread::saveFriendData(const QJsonDocument &doc)
+{
+    QString accountNumber = doc["AccountNumber"].toString();            //自己的账号
+    QString friendAccountNumber = doc["FriendAccountNumber"].toString();//好友账号
+    /* 按账号存储各种信息 */
+    /* 聊天记录先取再存 */
+    QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
+    QJsonValue newChatData = doc["ChatHistory"];
+    data.append(newChatData);
+
+    settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
+                       data);  //聊天记录
+}
+
+QJsonArray MyThread::getFriendChatHistory(const QString &accountNumber, const QString &key)
+{
+    settings->beginGroup(accountNumber);  //进入目录
+    settings->beginGroup("FriendList");   //进入好友列表目录
+    settings->beginGroup(key);            //进入指定好友目录
+    QJsonArray data = settings->value("ChatHistory").toJsonArray();//获取聊天记录
+    settings->endGroup();  //退出目录
     settings->endGroup();  //退出目录
     settings->endGroup();  //退出目录
 
