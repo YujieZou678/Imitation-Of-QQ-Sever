@@ -22,7 +22,8 @@ public:
 
 signals:
     void finished_CheckAccountNumber(MySocket *, const QJsonDocument&);  //账号检测完毕
-    void finished_Login(MySocket *, const QString &);                                //登陆检测完毕
+    void finished_Register(MySocket *, const QString &);                 //注册完毕
+    void finished_Login(MySocket *, const QString &, const QString &);   //登陆检测完毕
 
 private:
     enum class Purpose {  //枚举(class内部使用)

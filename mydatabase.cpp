@@ -62,7 +62,7 @@ QString MyDatabase::checkAccountNumber(const QString &accountNumber)
     return "false";
 }
 
-void MyDatabase::addUser(const QString &accountNumber, const QString &password)
+QString MyDatabase::addUser(const QString &accountNumber, const QString &password)
 {
     QSqlQuery query(db);
     query.prepare("insert into User(AccountNumber, Password) values(:accountNumber, :password)");
@@ -71,8 +71,10 @@ void MyDatabase::addUser(const QString &accountNumber, const QString &password)
     bool ok = query.exec();
     if (!ok) {
         qDebug() << "Query addUser failed:" << query.lastError().text();
-        return;
+        return "false";
     }
+
+    return "true";
 }
 
 QString MyDatabase::checkLogin(const QString &accountNumber, const QString &password)

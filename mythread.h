@@ -31,6 +31,7 @@ public:
     QString getPersonalData(const QString&, const QString&);  //获取个人信息
     void saveFriendData(const QJsonDocument&);                //缓存好友信息
     QJsonArray getFriendChatHistory(const QString&, const QString&);//获取聊天记录
+    QJsonArray getFriendArray(const QString&);                //获取好友列表
 
     int socketCount{0};   //当前正在管理的socket数量
     int ID;               //属于第几个线程
@@ -47,7 +48,8 @@ signals:
 public slots:
     void onPrintThreadStart();                           //打印"子线程已启动"
     void onFinished_CheckAccountNumber(MySocket *, const QJsonDocument&);  //账号检测完毕
-    void onFinished_Login(MySocket *, const QString &);  //登陆检测完毕
+    void onFinished_Register(MySocket *, const QString&);//注册完毕
+    void onFinished_Login(MySocket *, const QString &, const QString &);   //登陆检测完毕
     void onFinished_PrepareSendFile(MySocket *socket);   //返回发送文件的信息
     void onFinished_SendFile(MySocket *socket);          //返回接收文件完成
 
@@ -62,6 +64,7 @@ private:
         ReceiveFile,
         ChangePersonalData,
         AddFriend,
+        RequestGetProfileAndName,
         SingleChat
     };
 

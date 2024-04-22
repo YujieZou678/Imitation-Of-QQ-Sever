@@ -27,6 +27,7 @@ MyThread::MyThread(QObject *parent) :
         {"ReceiveFile", Purpose::ReceiveFile},
         {"ChangePersonalData", Purpose::ChangePersonalData},
         {"AddFriend", Purpose::AddFriend},
+        {"RequestGetProfileAndName", Purpose::RequestGetProfileAndName},
         {"SingleChat", Purpose::SingleChat}
     };
 
@@ -105,6 +106,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
         }
         case Purpose::Register: {
             MySubThread *mySubThread = new MySubThread(socket, doc);
+            connect(mySubThread, &MySubThread::finished_Register, this, &MyThread::onFinished_Register);
             myThreadPool->start(mySubThread);
             break;
         }
@@ -152,6 +154,23 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             saveFriendData(doc);
             qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
                      << "好友信息存入完成";
+            break;
+        }
+        case Purpose::RequestGetProfileAndName: {
+            /* 准备发送文件+昵称 */
+            QString accountNumber = doc["AccountNumber"].toString();      //账号
+            qint64 fileSize = getProfileImageSize(accountNumber);         //文件大小
+            QString nickName = getPersonalData(accountNumber, "NickName");//昵称
+
+            QJsonObject json;
+            json.insert("Purpose", "RequestGetProfileAndName");  //目的
+            json.insert("AccountNumber", accountNumber);
+            json.insert("FileSize", fileSize);
+            json.insert("NickName", nickName);
+            QJsonDocument doc(json);
+            QByteArray data = doc.toJson();
+
+            socket->write(data);
             break;
         }
         case Purpose::SingleChat: {
@@ -279,14 +298,17 @@ void MyThread::saveFriendData(const QJsonDocument &doc)
 {
     QString accountNumber = doc["AccountNumber"].toString();            //自己的账号
     QString friendAccountNumber = doc["FriendAccountNumber"].toString();//好友账号
-    /* 按账号存储各种信息 */
     /* 聊天记录先取再存 */
     QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
     QJsonValue newChatData = doc["ChatHistory"];
     data.append(newChatData);
-
     settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
-                       data);  //聊天记录
+                       data);
+    /* NameArray先取再存 */
+    data = getFriendArray(accountNumber);
+    data.append(friendAccountNumber);
+    settings->setValue(accountNumber+"/FriendList/NameArray",
+                       data);  //好友列表Array格式
 }
 
 QJsonArray MyThread::getFriendChatHistory(const QString &accountNumber, const QString &key)
@@ -300,6 +322,18 @@ QJsonArray MyThread::getFriendChatHistory(const QString &accountNumber, const QS
     settings->endGroup();  //退出目录
 
     return data;
+}
+
+QJsonArray MyThread::getFriendArray(const QString &accountNumber)
+{
+    /* 获取好友列表NameArray */
+    settings->beginGroup(accountNumber); //进入目录
+    settings->beginGroup("FriendList");  //进入好友列表目录
+    QJsonArray friendArray = settings->value("NameArray").toJsonArray();
+    settings->endGroup();  //退出目录
+    settings->endGroup();  //退出目录
+
+    return friendArray;
 }
 
 void MyThread::onPrintThreadStart()
@@ -316,7 +350,7 @@ void MyThread::onReceiveFromSubThread(const QString &msg)
 
 void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocument &_doc)
 {
-    QString check = _doc["Check"].toString();
+    QString check = _doc["Check"].toString();  //是不是用于登陆
     QString isExit = _doc["Reply"].toString();
 
     QJsonObject json;
@@ -325,21 +359,10 @@ void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocume
     json.insert("Reply", isExit);  //回复
 
     if (isExit == "true" && check == "Login") {  //账号有效 且 用于登陆：个人信息 头像文件
-        QString accountNumber = _doc["AccountNumber"].toString();       //账号
-        qint64 fileSize = getProfileImageSize(accountNumber);           //文件大小
-        QString NickName = getPersonalData(accountNumber, "NickName");  //昵称
-        QString Sex = getPersonalData(accountNumber, "Sex");            //性别
-        QString ZodiacSign = getPersonalData(accountNumber, "ZodiacSign");//属相
-        QString BloodGroup = getPersonalData(accountNumber, "BloodGroup");//血型
-        QString PersonalSignature = getPersonalData(accountNumber, "PersonalSignature");//个性签名
-
+        QString accountNumber = _doc["AccountNumber"].toString();  //账号
+        qint64 fileSize = getProfileImageSize(accountNumber);      //文件大小
         json.insert("AccountNumber", accountNumber);
         json.insert("FileSize", fileSize);
-        json.insert("NickName", NickName);
-        json.insert("Sex", Sex);
-        json.insert("ZodiacSign", ZodiacSign);
-        json.insert("BloodGroup", BloodGroup);
-        json.insert("PersonalSignature", PersonalSignature);
     }
 
     QJsonDocument doc(json);
@@ -347,14 +370,43 @@ void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocume
     socket->write(data);  //发送存在的信息
 }
 
-void MyThread::onFinished_Login(MySocket *socket, const QString &isRight)
+void MyThread::onFinished_Register(MySocket *socket, const QString &isOk)
 {
     QJsonObject json;
-    json.insert("Purpose", "Login");  //目的
-    json.insert("Reply", isRight);  //回复
+    json.insert("Purpose", "Register");  //目的
+    json.insert("Reply", isOk);          //是否注册成功
     QJsonDocument doc(json);
     QByteArray data = doc.toJson();
 
+    socket->write(data);  //发送存在的信息
+}
+
+void MyThread::onFinished_Login(MySocket *socket, const QString &isRight, const QString &accountNumber)
+{
+    QJsonObject json;
+    json.insert("Purpose", "Login");  //目的
+    json.insert("Reply", isRight);    //密码是否正确
+
+    if (isRight == "true") {  //如果密码正确
+        QString NickName = getPersonalData(accountNumber, "NickName");  //昵称
+        QString Sex = getPersonalData(accountNumber, "Sex");            //性别
+        QString ZodiacSign = getPersonalData(accountNumber, "ZodiacSign");//属相
+        QString BloodGroup = getPersonalData(accountNumber, "BloodGroup");//血型
+        QString PersonalSignature = getPersonalData(accountNumber, "PersonalSignature");//个性签名
+        QJsonArray friendArray = getFriendArray(accountNumber);  //好友列表
+
+        /* 获取个人信息 */
+        json.insert("NickName", NickName);
+        json.insert("Sex", Sex);
+        json.insert("ZodiacSign", ZodiacSign);
+        json.insert("BloodGroup", BloodGroup);
+        json.insert("PersonalSignature", PersonalSignature);
+        /* 获取好友列表 账号 */
+        json.insert("FriendArray", friendArray);
+    }
+
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
     socket->write(data);  //发送存在的信息
 }
 

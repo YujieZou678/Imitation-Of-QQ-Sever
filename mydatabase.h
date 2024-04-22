@@ -11,7 +11,7 @@ public:
 
     void createUserTable();  //创建表
     QString checkAccountNumber(const QString&);           //检测账号
-    void addUser(const QString&, const QString &);        //添加用户
+    QString addUser(const QString&, const QString &);     //添加用户(注册)
     QString checkLogin(const QString&, const QString &);  //检测登陆信息
 
 private:

@@ -68,7 +68,8 @@ void MySubThread::run()
     }
     case Purpose::Register: {
         MyDatabase myDatabase;
-        myDatabase.addUser(accountNumber, password);
+        QString isOk = myDatabase.addUser(accountNumber, password);
+        emit finished_Register(socket, isOk);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "用户注册完毕。";
         break;
@@ -76,7 +77,7 @@ void MySubThread::run()
     case Purpose::Login: {
         MyDatabase myDatabase;
         QString isRight = myDatabase.checkLogin(accountNumber, password);
-        emit finished_Login(socket, isRight);
+        emit finished_Login(socket, isRight, accountNumber);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "登陆检测完毕。";
         break;
