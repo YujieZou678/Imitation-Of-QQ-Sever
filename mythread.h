@@ -29,7 +29,7 @@ public:
     void startSendFile(MySocket *, const QByteArray &_data);  //开始传输文件
     void savePersonalData(const QJsonDocument&);              //缓存个人信息
     QString getPersonalData(const QString&, const QString&);  //获取个人信息
-    void saveFriendData(const QJsonDocument&);                //缓存好友信息
+    void saveFriendData(const QJsonDocument&);                //缓存好友信息(加好友)
     QJsonArray getFriendChatHistory(const QString&, const QString&);//获取聊天记录
     QJsonArray getFriendArray(const QString&);                //获取好友列表
 
@@ -65,6 +65,8 @@ private:
         ChangePersonalData,
         AddFriend,
         RequestGetProfileAndName,
+        SaveChatHistory,
+        GetChatHistory,
         SingleChat
     };
 

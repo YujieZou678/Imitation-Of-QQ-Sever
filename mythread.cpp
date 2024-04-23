@@ -28,6 +28,8 @@ MyThread::MyThread(QObject *parent) :
         {"ChangePersonalData", Purpose::ChangePersonalData},
         {"AddFriend", Purpose::AddFriend},
         {"RequestGetProfileAndName", Purpose::RequestGetProfileAndName},
+        {"SaveChatHistory", Purpose::SaveChatHistory},
+        {"GetChatHistory", Purpose::GetChatHistory},
         {"SingleChat", Purpose::SingleChat}
     };
 
@@ -167,10 +169,43 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             json.insert("AccountNumber", accountNumber);
             json.insert("FileSize", fileSize);
             json.insert("NickName", nickName);
-            QJsonDocument doc(json);
-            QByteArray data = doc.toJson();
+            QJsonDocument _doc(json);
+            QByteArray data = _doc.toJson();
 
             socket->write(data);
+            break;
+        }
+        case Purpose::SaveChatHistory: {
+            /* 转发聊天记录+云缓存 */
+            QString accountNumber = doc["AccountNumber"].toString();            //自己的账号
+            QString friendAccountNumber = doc["FriendAccountNumber"].toString();//好友账号
+            QString isNeedTransmit = doc["IsNeedTransmit"].toString();          //是否需要转发
+            if (isNeedTransmit == "true") {
+                /* 转发 */
+                //
+            }
+            /* 聊天记录先取再存 */
+            QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
+            QJsonValue newChatData = doc["ChatHistory"];
+            data.append(newChatData);
+            settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
+                               data);
+            break;
+        }
+        case Purpose::GetChatHistory: {
+            QString accountNumber = doc["AccountNumber"].toString();
+            QString friendAccountNumber = doc["FriendAccountNumber"].toString();
+            /* 获取聊天记录 */
+            QJsonArray chatHistory = getFriendChatHistory(accountNumber, friendAccountNumber);
+
+            QJsonObject json;
+            json.insert("Purpose", "GetChatHistory");  //目的
+            json.insert("FriendAccountNumber", friendAccountNumber);
+            json.insert("ChatHistory", chatHistory);  //聊天记录
+            QJsonDocument _doc(json);
+            QByteArray send_Data = _doc.toJson();
+
+            socket->write(send_Data);
             break;
         }
         case Purpose::SingleChat: {
@@ -179,7 +214,7 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             if (object == "572211") {
                 qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
                          << "已发送给"+object;
-                    emit toThread2_SendMsg(content);
+                emit toThread2_SendMsg(content);
             }
             break;
         }
