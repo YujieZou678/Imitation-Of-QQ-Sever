@@ -51,15 +51,25 @@ MyTcpServer::MyTcpServer(QTcpServer *parent)
             /* 子线程添加socket管理 */
             connect(this, &MyTcpServer::toThread1_addOneSocket, myThreads[i], &MyThread::addOneSocket);
             /* 子线程1-->子线程2 */
-            connect(myThreads[i], &MyThread::toThread2_SendMsg, myThreads[i+1], &MyThread::onReceiveFromSubThread);
+            connect(myThreads[i], &MyThread::toSubThread2_SendMsg, myThreads[i+1], &MyThread::onReceiveFromSubThread);
+            /* 子线程1-->子线程3 */
+            connect(myThreads[i], &MyThread::toSubThread3_SendMsg, myThreads[i+2], &MyThread::onReceiveFromSubThread);
             break;
         case 2:
             connect(this, &MyTcpServer::toThread2_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
             connect(this, &MyTcpServer::toThread2_addOneSocket, myThreads[i], &MyThread::addOneSocket);
+            /* 子线程2-->子线程1 */
+            connect(myThreads[i], &MyThread::toSubThread1_SendMsg, myThreads[i-1], &MyThread::onReceiveFromSubThread);
+            /* 子线程2-->子线程3 */
+            connect(myThreads[i], &MyThread::toSubThread3_SendMsg, myThreads[i+1], &MyThread::onReceiveFromSubThread);
             break;
         case 3:
             connect(this, &MyTcpServer::toThread3_PrintThreadStart, myThreads[i], &MyThread::onPrintThreadStart);
             connect(this, &MyTcpServer::toThread3_addOneSocket, myThreads[i], &MyThread::addOneSocket);
+            /* 子线程3-->子线程1 */
+            connect(myThreads[i], &MyThread::toSubThread1_SendMsg, myThreads[i-2], &MyThread::onReceiveFromSubThread);
+            /* 子线程3-->子线程2 */
+            connect(myThreads[i], &MyThread::toSubThread2_SendMsg, myThreads[i-1], &MyThread::onReceiveFromSubThread);
             break;
         default:
             break;

@@ -43,7 +43,9 @@ signals:
     void needOpenListen();  //打开server监听
 
     /* 子线程间的通信 */
-    void toThread2_SendMsg(const QString&);  //给线程2发信息
+    void toSubThread1_SendMsg(const QJsonDocument&);  //给子线程1发信息
+    void toSubThread2_SendMsg(const QJsonDocument&);  //给子线程2发信息
+    void toSubThread3_SendMsg(const QJsonDocument&);  //给子线程3发信息
 
 public slots:
     void onPrintThreadStart();                           //打印"子线程已启动"
@@ -53,7 +55,7 @@ public slots:
     void onFinished_PrepareSendFile(MySocket *socket);   //返回发送文件的信息
     void onFinished_SendFile(MySocket *socket);          //返回接收文件完成
 
-    void onReceiveFromSubThread(const QString&);         //接收来自子线程的信息
+    void onReceiveFromSubThread(const QJsonDocument&);         //接收来自子线程的信息
 
 private:
     enum class Purpose {  //枚举(class内部使用)
@@ -67,10 +69,14 @@ private:
         RequestGetProfileAndName,
         SaveChatHistory,
         GetChatHistory,
-        SingleChat
+
+        /* 子线程间的通信 */
+        RefreshFriendList,
+        ChatByMsg
     };
 
     QMap<QString,MySocket*> socketsMap;      //容器管理socket
+    QMap<QString,MySocket*> accountSocketsMap;//账号对应socket, 同上
     QMap<QString, enum Purpose> map_Switch;  //用于寻找信息是哪个目的
     QThreadPool *myThreadPool;  //获取当前程序的线程池对象
     QSettings *settings;        //缓存数据对象

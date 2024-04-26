@@ -15,6 +15,8 @@ date: 2024.3.27
 #include "mysubthread.h"
 #include "myconfig.h"
 
+extern QMap<QString,int> accountNumberMap;
+
 MyThread::MyThread(QObject *parent) :
     QObject(parent)
 {
@@ -30,7 +32,9 @@ MyThread::MyThread(QObject *parent) :
         {"RequestGetProfileAndName", Purpose::RequestGetProfileAndName},
         {"SaveChatHistory", Purpose::SaveChatHistory},
         {"GetChatHistory", Purpose::GetChatHistory},
-        {"SingleChat", Purpose::SingleChat}
+
+        /* 子线程间的通信 */
+        {"RefreshFriendList", Purpose::RefreshFriendList}
     };
 
     //myThreadPool
@@ -208,22 +212,25 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             socket->write(send_Data);
             break;
         }
-        case Purpose::SingleChat: {
-            QString object = doc["Object"].toString();    //对象
-            QString content = doc["Content"].toString();  //内容
-            if (object == "572211") {
-                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-                         << "已发送给"+object;
-                emit toThread2_SendMsg(content);
-            }
-            break;
-        }
+//        case Purpose::SingleChat: {
+//            QString object = doc["Object"].toString();    //对象
+//            QString content = doc["Content"].toString();  //内容
+//            if (object == "572211") {
+//                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+//                         << "已发送给"+object;
+//                emit toSubThread2_SendMsg(content);
+//            }
+//            break;
+//        }
         default:
             break;
         }
     });
     connect(socket, &MySocket::disconnected, [=](){
         socketsMap.remove(ip_port);
+        QString accountNumber = socket->accountNumber;
+        accountNumberMap.remove(accountNumber);
+        accountSocketsMap.remove(accountNumber);
         socket->deleteLater();  //不能立刻删除!!!
 
         socketCount -= 1;
@@ -333,17 +340,93 @@ void MyThread::saveFriendData(const QJsonDocument &doc)
 {
     QString accountNumber = doc["AccountNumber"].toString();            //自己的账号
     QString friendAccountNumber = doc["FriendAccountNumber"].toString();//好友账号
+
+    /* 单独处理注册时加自己为好友 */
+    if (accountNumber == friendAccountNumber) {
+        /* 聊天记录先取再存 */
+        QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
+        QJsonValue newChatData = doc["ChatHistory"];
+        data.append(newChatData);
+        settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
+                           data);
+
+        /* NameArray先取再存 */
+        data = getFriendArray(accountNumber);
+        data.append(friendAccountNumber);
+        settings->setValue(accountNumber+"/FriendList/NameArray",
+                           data);  //好友列表Array格式
+        return;
+    }
+
+    /* 双向加好友 */
+    /* 1 */
     /* 聊天记录先取再存 */
     QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
     QJsonValue newChatData = doc["ChatHistory"];
     data.append(newChatData);
     settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
                        data);
+
     /* NameArray先取再存 */
     data = getFriendArray(accountNumber);
     data.append(friendAccountNumber);
     settings->setValue(accountNumber+"/FriendList/NameArray",
                        data);  //好友列表Array格式
+
+    /* 2 */
+    /* 聊天记录先取再存 */
+    QJsonArray data2 = getFriendChatHistory(friendAccountNumber, accountNumber);
+    QJsonValue newChatData2 = doc["ChatHistory"];
+    data2.append(newChatData2);
+    settings->setValue(friendAccountNumber+"/FriendList/"+accountNumber+"/ChatHistory",
+                       data2);
+
+    /* NameArray先取再存 */
+    data2 = getFriendArray(friendAccountNumber);
+    data2.append(accountNumber);
+    settings->setValue(friendAccountNumber+"/FriendList/NameArray",
+                       data2);  //好友列表Array格式
+    /* 双向刷新好友列表 */
+    /* 1 */
+    QJsonObject json;
+    json.insert("Purpose", "RefreshFriendList");  //目的
+    QJsonDocument _doc(json);
+    QByteArray send_Data = _doc.toJson();
+    accountSocketsMap.value(accountNumber)->write(send_Data);  //发送存在的信息
+    /* 2 */
+    /* 判断是否在线 */
+    if (accountNumberMap.find(friendAccountNumber) == accountNumberMap.end()) {
+        /* 不在线 */
+        return;
+    }
+    /* 在线，获取在哪个线程 */
+    int atSubThread = accountNumberMap.value(friendAccountNumber);
+    if (atSubThread == ID) {
+        /* 位于当前线程 */
+        accountSocketsMap.value(friendAccountNumber)->write(send_Data);  //同上
+    } else {
+        /* 位于其他线程 */
+        /* 把任务发送到对应的线程执行 */
+        json.insert("AccountNumber", friendAccountNumber);
+        json.insert("SubThread", ID);
+        QJsonDocument _doc(json);
+        switch (atSubThread) {
+        case 1: {
+                            emit toSubThread1_SendMsg(_doc);
+                            break;
+        }
+        case 2: {
+                            emit toSubThread2_SendMsg(_doc);
+                            break;
+        }
+        case 3: {
+                            emit toSubThread3_SendMsg(_doc);
+                            break;
+        }
+        default:
+                            break;
+        }
+    }
 }
 
 QJsonArray MyThread::getFriendChatHistory(const QString &accountNumber, const QString &key)
@@ -377,10 +460,25 @@ void MyThread::onPrintThreadStart()
              << "一个子线程已启用。";
 }
 
-void MyThread::onReceiveFromSubThread(const QString &msg)
+void MyThread::onReceiveFromSubThread(const QJsonDocument &doc)
 {
+    /* 处理来自子线程的转发消息 */
+    int subThread = doc["SubThread"].toInt();  //发出的子线程号
+    QString data_Purpose = doc["Purpose"].toString();
+    enum Purpose purpose = map_Switch[data_Purpose];
+    switch (purpose) {
+    case Purpose::RefreshFriendList: {
+        QString accountNumber = doc["AccountNumber"].toString();
+        QByteArray send_Data = doc.toJson();
+        accountSocketsMap.value(accountNumber)->write(send_Data);  //?
+        break;
+    }
+    default:
+        break;
+    }
+
     qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-             << msg;
+             << "已接收来自子线程"+QString::number(subThread)+"的消息";
 }
 
 void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocument &_doc)
@@ -423,6 +521,11 @@ void MyThread::onFinished_Login(MySocket *socket, const QString &isRight, const 
     json.insert("Reply", isRight);    //密码是否正确
 
     if (isRight == "true") {  //如果密码正确
+        /* 该账号在线 */
+        socket->accountNumber = accountNumber;
+        accountNumberMap.insert(accountNumber, ID);
+        accountSocketsMap.insert(accountNumber, socket);
+
         QString NickName = getPersonalData(accountNumber, "NickName");  //昵称
         QString Sex = getPersonalData(accountNumber, "Sex");            //性别
         QString ZodiacSign = getPersonalData(accountNumber, "ZodiacSign");//属相
