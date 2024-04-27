@@ -34,7 +34,8 @@ MyThread::MyThread(QObject *parent) :
         {"GetChatHistory", Purpose::GetChatHistory},
 
         /* 子线程间的通信 */
-        {"RefreshFriendList", Purpose::RefreshFriendList}
+        {"RefreshFriendList", Purpose::RefreshFriendList},
+        {"TransmitMsg", Purpose::TransmitMsg}
     };
 
     //myThreadPool
@@ -186,13 +187,62 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             QString isNeedTransmit = doc["IsNeedTransmit"].toString();          //是否需要转发
             if (isNeedTransmit == "true") {
                 /* 转发 */
-                //
+                /* 判断是否在线 */
+                if (accountNumberMap.find(friendAccountNumber) == accountNumberMap.end()) {
+                    /* 不在线 */
+                    return;
+                }
+                /* 在线，获取转发内容 */
+                QJsonObject json;
+                json.insert("Purpose", "TransmitMsg");
+                QJsonObject msg = doc["ChatHistory2"].toObject();
+                json.insert("Msg", msg);
+                json.insert("SendPerson", accountNumber);
+                QJsonDocument _doc(json);
+                QByteArray send_Data = _doc.toJson();
+                /* 获取所在线程 */
+                int atSubThread = accountNumberMap.value(friendAccountNumber);
+                if (atSubThread == ID) {
+                    /* 位于当前线程 */
+                    accountSocketsMap.value(friendAccountNumber)->write(send_Data);  //同上
+                } else {
+                    /* 位于其他线程 */
+                    /* 把任务发送到对应的线程执行 */
+                    json.insert("AccountNumber", friendAccountNumber);
+                    json.insert("SubThread", ID);
+                    QJsonDocument _doc(json);
+                    switch (atSubThread) {
+                    case 1: {
+                        emit toSubThread1_SendMsg(_doc);
+                        break;
+                    }
+                    case 2: {
+                        emit toSubThread2_SendMsg(_doc);
+                        break;
+                    }
+                    case 3: {
+                        emit toSubThread3_SendMsg(_doc);
+                        break;
+                    }
+                    default:
+                        break;
+                    }
+                }
             }
             /* 聊天记录先取再存 */
+            /* 1 */
             QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
-            QJsonValue newChatData = doc["ChatHistory"];
+            QJsonValue newChatData = doc["ChatHistory1"];
             data.append(newChatData);
             settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
+                               data);
+            if (accountNumber == friendAccountNumber) return;
+
+            /* 2 */
+            data = getFriendChatHistory(friendAccountNumber, accountNumber);
+            newChatData = doc["ChatHistory2"];
+            data.append(newChatData);
+            settings->setValue(friendAccountNumber+"/FriendList/"+accountNumber+"/ChatHistory",
                                data);
             break;
         }
@@ -390,6 +440,8 @@ void MyThread::saveFriendData(const QJsonDocument &doc)
     /* 1 */
     QJsonObject json;
     json.insert("Purpose", "RefreshFriendList");  //目的
+    QJsonArray friendArray = getFriendArray(accountNumber);  //好友列表
+    json.insert("FriendArray", friendArray);
     QJsonDocument _doc(json);
     QByteArray send_Data = _doc.toJson();
     accountSocketsMap.value(accountNumber)->write(send_Data);  //发送存在的信息
@@ -409,6 +461,8 @@ void MyThread::saveFriendData(const QJsonDocument &doc)
         /* 把任务发送到对应的线程执行 */
         json.insert("AccountNumber", friendAccountNumber);
         json.insert("SubThread", ID);
+        QJsonArray friendArray = getFriendArray(friendAccountNumber);  //好友列表
+        json.insert("FriendArray", friendArray);  //覆盖
         QJsonDocument _doc(json);
         switch (atSubThread) {
         case 1: {
@@ -470,7 +524,13 @@ void MyThread::onReceiveFromSubThread(const QJsonDocument &doc)
     case Purpose::RefreshFriendList: {
         QString accountNumber = doc["AccountNumber"].toString();
         QByteArray send_Data = doc.toJson();
-        accountSocketsMap.value(accountNumber)->write(send_Data);  //?
+        accountSocketsMap.value(accountNumber)->write(send_Data);
+        break;
+    }
+    case Purpose::TransmitMsg: {
+        QString accountNumber = doc["AccountNumber"].toString();
+        QByteArray send_Data = doc.toJson();
+        accountSocketsMap.value(accountNumber)->write(send_Data);
         break;
     }
     default:

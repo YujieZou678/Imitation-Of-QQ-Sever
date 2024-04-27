@@ -72,7 +72,7 @@ private:
 
         /* 子线程间的通信 */
         RefreshFriendList,
-        ChatByMsg
+        TransmitMsg
     };
 
     QMap<QString,MySocket*> socketsMap;      //容器管理socket
