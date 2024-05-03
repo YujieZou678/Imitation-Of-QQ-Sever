@@ -181,12 +181,28 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             break;
         }
         case Purpose::SaveChatHistory: {
-            /* 转发聊天记录+云缓存 */
+            /* 云缓存+转发聊天记录 */
             QString accountNumber = doc["AccountNumber"].toString();            //自己的账号
             QString friendAccountNumber = doc["FriendAccountNumber"].toString();//好友账号
             QString isNeedTransmit = doc["IsNeedTransmit"].toString();          //是否需要转发
+            /* 云缓存 */
+            /* 1 */
+            QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
+            QJsonValue newChatData = doc["ChatHistory1"];
+            data.append(newChatData);
+            settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
+                               data);
+            if (accountNumber == friendAccountNumber) return;
+
+            /* 2 */
+            data = getFriendChatHistory(friendAccountNumber, accountNumber);
+            newChatData = doc["ChatHistory2"];
+            data.append(newChatData);
+            settings->setValue(friendAccountNumber+"/FriendList/"+accountNumber+"/ChatHistory",
+                               data);
+
+            /* 转发 */
             if (isNeedTransmit == "true") {
-                /* 转发 */
                 /* 判断是否在线 */
                 if (accountNumberMap.find(friendAccountNumber) == accountNumberMap.end()) {
                     /* 不在线 */
@@ -229,21 +245,6 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
                     }
                 }
             }
-            /* 聊天记录先取再存 */
-            /* 1 */
-            QJsonArray data = getFriendChatHistory(accountNumber, friendAccountNumber);
-            QJsonValue newChatData = doc["ChatHistory1"];
-            data.append(newChatData);
-            settings->setValue(accountNumber+"/FriendList/"+friendAccountNumber+"/ChatHistory",
-                               data);
-            if (accountNumber == friendAccountNumber) return;
-
-            /* 2 */
-            data = getFriendChatHistory(friendAccountNumber, accountNumber);
-            newChatData = doc["ChatHistory2"];
-            data.append(newChatData);
-            settings->setValue(friendAccountNumber+"/FriendList/"+accountNumber+"/ChatHistory",
-                               data);
             break;
         }
         case Purpose::GetChatHistory: {
