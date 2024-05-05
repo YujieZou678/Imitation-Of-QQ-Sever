@@ -18,7 +18,7 @@ MySubThread::MySubThread(MySocket *_socket, QJsonDocument _doc, QObject *parent)
         {"CheckAccountNumber", Purpose::CheckAccountNumber},
         {"Register", Purpose::Register},
         {"Login", Purpose::Login},
-        {"SingleChat", Purpose::SingleChat}
+        {"CreateGroup", Purpose::CreateGroup}
     };
 
     //socket
@@ -43,6 +43,10 @@ MySubThread::MySubThread(MySocket *_socket, QJsonDocument _doc, QObject *parent)
     case Purpose::Login: {
         accountNumber = _doc["AccountNumber"].toString();
         password = _doc["Password"].toString();
+        break;
+    }
+    case Purpose::CreateGroup: {
+        accountNumber = _doc["GroupNumber"].toString();
         break;
     }
     default:
@@ -80,6 +84,18 @@ void MySubThread::run()
         emit finished_Login(socket, isRight, accountNumber);
         qDebug() << "线程池" << QThread::currentThread() << ":"
                  << "登陆检测完毕。";
+        break;
+    }
+    case Purpose::CreateGroup: {
+        MyDatabase myDatabase;
+        QString isExit = myDatabase.checkAccountNumber(accountNumber);
+        QJsonObject json;
+        json.insert("GroupNumber", accountNumber);
+        json.insert("Reply", isExit);
+        QJsonDocument _doc(json);
+        emit finished_CheckGroupNumber(socket, _doc);
+        qDebug() << "线程池" << QThread::currentThread() << ":"
+                 << "群账号检测完毕。";
         break;
     }
     default:

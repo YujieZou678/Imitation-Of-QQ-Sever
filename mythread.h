@@ -50,12 +50,13 @@ signals:
 public slots:
     void onPrintThreadStart();                           //打印"子线程已启动"
     void onFinished_CheckAccountNumber(MySocket *, const QJsonDocument&);  //账号检测完毕
+    void onFinished_CheckGroupNumber(MySocket *, const QJsonDocument&);    //群账号检测完毕
     void onFinished_Register(MySocket *, const QString&);//注册完毕
     void onFinished_Login(MySocket *, const QString &, const QString &);   //登陆检测完毕
     void onFinished_PrepareSendFile(MySocket *socket);   //返回发送文件的信息
     void onFinished_SendFile(MySocket *socket);          //返回接收文件完成
 
-    void onReceiveFromSubThread(const QJsonDocument&);         //接收来自子线程的信息
+    void onReceiveFromSubThread(const QJsonDocument&);   //接收来自子线程的信息
 
 private:
     enum class Purpose {  //枚举(class内部使用)
@@ -69,6 +70,7 @@ private:
         RequestGetProfileAndName,
         SaveChatHistory,
         GetChatHistory,
+        CreateGroup,
 
         /* 子线程间的通信 */
         RefreshFriendList,

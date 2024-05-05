@@ -32,6 +32,7 @@ MyThread::MyThread(QObject *parent) :
         {"RequestGetProfileAndName", Purpose::RequestGetProfileAndName},
         {"SaveChatHistory", Purpose::SaveChatHistory},
         {"GetChatHistory", Purpose::GetChatHistory},
+        {"CreateGroup", Purpose::CreateGroup},
 
         /* 子线程间的通信 */
         {"RefreshFriendList", Purpose::RefreshFriendList},
@@ -263,16 +264,14 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             socket->write(send_Data);
             break;
         }
-//        case Purpose::SingleChat: {
-//            QString object = doc["Object"].toString();    //对象
-//            QString content = doc["Content"].toString();  //内容
-//            if (object == "572211") {
-//                qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-//                         << "已发送给"+object;
-//                emit toSubThread2_SendMsg(content);
-//            }
-//            break;
-//        }
+        case Purpose::CreateGroup: {
+            QString groupNumber = doc["GroupNumber"].toString();
+            /* 查找群号是否已存在 */
+            MySubThread *mySubThread = new MySubThread(socket, doc);
+            connect(mySubThread, &MySubThread::finished_CheckGroupNumber, this, &MyThread::onFinished_CheckGroupNumber);
+            myThreadPool->start(mySubThread);
+            break;
+        }
         default:
             break;
         }
@@ -562,6 +561,25 @@ void MyThread::onFinished_CheckAccountNumber(MySocket *socket, const QJsonDocume
     QJsonDocument doc(json);
     QByteArray data = doc.toJson();
     socket->write(data);  //发送存在的信息
+}
+
+void MyThread::onFinished_CheckGroupNumber(MySocket *socket, const QJsonDocument &doc)
+{
+    QString isExit = doc["Reply"].toString();
+
+    if (isExit == "true") {
+        QJsonObject json;
+        json.insert("Purpose", "CheckGroupNumber");  //目的
+        QJsonDocument _doc(json);
+        QByteArray data = _doc.toJson();
+
+        socket->write(data);  //发送存在的信息
+    } else {
+        QString groupNumber = doc["GroupNumber"].toString();
+        qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                 << "准备创建群聊 "+groupNumber;
+        //
+    }
 }
 
 void MyThread::onFinished_Register(MySocket *socket, const QString &isOk)

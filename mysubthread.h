@@ -24,13 +24,14 @@ signals:
     void finished_CheckAccountNumber(MySocket *, const QJsonDocument&);  //账号检测完毕
     void finished_Register(MySocket *, const QString &);                 //注册完毕
     void finished_Login(MySocket *, const QString &, const QString &);   //登陆检测完毕
+    void finished_CheckGroupNumber(MySocket *, const QJsonDocument &);         //群账号检测完毕
 
 private:
     enum class Purpose {  //枚举(class内部使用)
         CheckAccountNumber,
         Register,
         Login,
-        SingleChat
+        CreateGroup
     };
     QMap<QString, enum Purpose> map_Switch;  //用于寻找信息是哪个目的
     enum Purpose myPurpose;  //当前任务
