@@ -40,6 +40,7 @@ private:
     MySocket *socket;
     /* 账号检测 */
     QString accountNumber;
+    QString groupNumber;
     QString check;  //用于判断是登陆or注册
     /* User注册 */
     QString password;

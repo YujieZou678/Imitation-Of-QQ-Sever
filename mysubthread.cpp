@@ -46,7 +46,8 @@ MySubThread::MySubThread(MySocket *_socket, QJsonDocument _doc, QObject *parent)
         break;
     }
     case Purpose::CreateGroup: {
-        accountNumber = _doc["GroupNumber"].toString();
+        accountNumber = _doc["AccountNumber"].toString();
+        groupNumber = _doc["GroupNumber"].toString();
         break;
     }
     default:
@@ -88,14 +89,22 @@ void MySubThread::run()
     }
     case Purpose::CreateGroup: {
         MyDatabase myDatabase;
-        QString isExit = myDatabase.checkAccountNumber(accountNumber);
+        QString isExit = myDatabase.checkAccountNumber(groupNumber);
+        qDebug() << "线程池" << QThread::currentThread() << ":"
+                 << "群账号检测完毕。";
+        /* 如果不存在直接创建该群聊 */
+        if (isExit == "false") {
+            myDatabase.addUser(groupNumber, "");
+            qDebug() << "线程池" << QThread::currentThread() << ":"
+                     << "群聊已创建。";
+        }
+        /* 传递结果 */
         QJsonObject json;
-        json.insert("GroupNumber", accountNumber);
+        json.insert("GroupNumber", groupNumber);
+        json.insert("AccountNumber", accountNumber);
         json.insert("Reply", isExit);
         QJsonDocument _doc(json);
         emit finished_CheckGroupNumber(socket, _doc);
-        qDebug() << "线程池" << QThread::currentThread() << ":"
-                 << "群账号检测完毕。";
         break;
     }
     default:

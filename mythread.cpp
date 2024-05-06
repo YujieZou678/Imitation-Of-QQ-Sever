@@ -33,6 +33,9 @@ MyThread::MyThread(QObject *parent) :
         {"SaveChatHistory", Purpose::SaveChatHistory},
         {"GetChatHistory", Purpose::GetChatHistory},
         {"CreateGroup", Purpose::CreateGroup},
+        {"GetFriendList", Purpose::GetFriendList},
+        {"SaveGroupChatHistory", Purpose::SaveGroupChatHistory},
+        {"GetGroupChatHistory", Purpose::GetGroupChatHistory},
 
         /* 子线程间的通信 */
         {"RefreshFriendList", Purpose::RefreshFriendList},
@@ -265,11 +268,49 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             break;
         }
         case Purpose::CreateGroup: {
-            QString groupNumber = doc["GroupNumber"].toString();
-            /* 查找群号是否已存在 */
             MySubThread *mySubThread = new MySubThread(socket, doc);
             connect(mySubThread, &MySubThread::finished_CheckGroupNumber, this, &MyThread::onFinished_CheckGroupNumber);
             myThreadPool->start(mySubThread);
+            break;
+        }
+        case Purpose::GetFriendList: {
+            QString accountNumber = doc["AccountNumber"].toString();
+            QJsonArray nameArray = getFriendArray(accountNumber);
+            QJsonObject json;
+            json.insert("Purpose", "GetFriendList");  //目的
+            json.insert("AccountNumber", accountNumber);
+            json.insert("FriendList", nameArray);
+            QJsonDocument _doc(json);
+            QByteArray send_Data = _doc.toJson();
+
+            socket->write(send_Data);
+            break;
+        }
+        case Purpose::SaveGroupChatHistory: {
+            /* 云缓存+转发聊天记录 */
+            QString groupNumber = doc["GroupNumber"].toString();
+            /* 云缓存 */
+            QJsonArray data = getGroupChatHistory(groupNumber);
+            QJsonValue newChatData = doc["ChatHistory"];
+            data.append(newChatData);
+            settings->setValue(groupNumber+"/ChatHistory",
+                               data);
+            /* 转发 */
+            //
+            break;
+        }
+        case Purpose::GetGroupChatHistory: {
+            QString groupNumber = doc["GroupNumber"].toString();
+            /* 获取群聊天记录 */
+            QJsonArray chatHistory = getGroupChatHistory(groupNumber);
+
+            QJsonObject json;
+            json.insert("Purpose", "GetGroupChatHistory");  //目的
+            json.insert("ChatHistory", chatHistory);  //聊天记录
+            QJsonDocument _doc(json);
+            QByteArray send_Data = _doc.toJson();
+
+            socket->write(send_Data);
             break;
         }
         default:
@@ -508,6 +549,15 @@ QJsonArray MyThread::getFriendArray(const QString &accountNumber)
     return friendArray;
 }
 
+QJsonArray MyThread::getGroupChatHistory(const QString &groupNumber)
+{
+    settings->beginGroup(groupNumber);  //进入目录
+    QJsonArray data = settings->value("ChatHistory").toJsonArray();
+    settings->endGroup();               //退出目录
+
+    return data;
+}
+
 void MyThread::onPrintThreadStart()
 {
     qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
@@ -576,9 +626,29 @@ void MyThread::onFinished_CheckGroupNumber(MySocket *socket, const QJsonDocument
         socket->write(data);  //发送存在的信息
     } else {
         QString groupNumber = doc["GroupNumber"].toString();
-        qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
-                 << "准备创建群聊 "+groupNumber;
-        //
+        QString accountNumber = doc["AccountNumber"].toString();
+        /* 双向加好友 */
+        /* 1 */
+        /* NameArray先取再存 */
+        QJsonArray data = getFriendArray(accountNumber);
+        data.append(groupNumber);
+        settings->setValue(accountNumber+"/FriendList/NameArray",
+                           data);  //好友列表Array格式
+        /* 2 */
+        /* NameArray先取再存 */
+        data = getFriendArray(groupNumber);
+        data.append(accountNumber);
+        settings->setValue(groupNumber+"/FriendList/NameArray",
+                           data);  //好友列表Array格式
+
+        /* 当前用户刷新好友列表 */
+        QJsonObject json;
+        json.insert("Purpose", "RefreshFriendList");  //目的
+        QJsonArray friendArray = getFriendArray(accountNumber);  //好友列表
+        json.insert("FriendArray", friendArray);
+        QJsonDocument _doc(json);
+        QByteArray send_Data = _doc.toJson();
+        socket->write(send_Data);  //发送存在的信息
     }
 }
 
