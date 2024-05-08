@@ -785,7 +785,18 @@ void MyThread::onFinished_Login(MySocket *socket, const QString &isRight, const 
     json.insert("Reply", isRight);    //密码是否正确
 
     if (isRight == "true") {  //如果密码正确
-        /* 该账号在线 */
+        /* 该账号在线(需判断是否重复在线) */
+        /* 判断 */
+        if (accountNumberMap.find(accountNumber) != accountNumberMap.end()) {
+                            /* 重复在线 */
+                            json.insert("IsRepeatOnline", "true");
+                            QJsonDocument doc(json);
+                            QByteArray data = doc.toJson();
+                            socket->write(data);  //发送存在的信息
+                            return;
+        }
+        /* 没有重复在线 */
+        json.insert("IsRepeatOnline", "false");
         socket->accountNumber = accountNumber;
         accountNumberMap.insert(accountNumber, ID);
         accountSocketsMap.insert(accountNumber, socket);
