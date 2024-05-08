@@ -138,6 +138,8 @@
  //2024.5.8
  1.群主：更改群头像，昵称。
  2.账号登陆独立问题：如果重复登陆，会发出密码错误的信号(先将就了OvO)。
+ 3.一次完整的测试：通过。
+ 4.完善技术文档。
  
  目前正在实现的功能：
  1.该软件基本实现完成，测试...
@@ -165,6 +167,13 @@
                         3.每台机子有最大写入量，如果数据太大则不能一次性写入，然后发送给其他端。解决办法：分包发送。
                         4.特别耗时的传输(超大文件传输)，应该建立新的连接，客户端和服务端都有独立的线程处理该传输。
                      }
+ 不同文件通用传输技术：QFile读出为二进制格式——>QByteArray传输——>然后在另一端用QFile创建写入。
+ QThreadPool, QRunnable: 线程池的使用。
+ QSettings：缓存数据。
+ Sqlite：微型数据库。
+ QTcpSocket
+ QTcpServer: void incomingConnection(qintptr socketDescriptor) override;  //重写, 分配socket给子线程
+ QRandomGenerator: 获取随机数。
  
  Qml:
  Layout布局

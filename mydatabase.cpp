@@ -1,3 +1,8 @@
+/*
+function: 数据库的处理。
+author: zouyujie
+date: 2024.3.25
+*/
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QThread>

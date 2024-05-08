@@ -46,7 +46,7 @@ MyThread::MyThread(QObject *parent) :
 
     //myThreadPool
     myThreadPool = QThreadPool::globalInstance();
-    myThreadPool->setMaxThreadCount(10);  //线程池最大线程数
+    myThreadPool->setMaxThreadCount(20);  //线程池最大线程数
 
     //settings
     settings = new QSettings("config/local.ini", QSettings::NativeFormat, this);

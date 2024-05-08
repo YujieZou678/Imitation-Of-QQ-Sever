@@ -1,3 +1,8 @@
+/*
+function: 数据库的处理。
+author: zouyujie
+date: 2024.3.25
+*/
 #ifndef MYDATABASE_H
 #define MYDATABASE_H
 
