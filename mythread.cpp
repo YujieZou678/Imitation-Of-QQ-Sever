@@ -36,6 +36,8 @@ MyThread::MyThread(QObject *parent) :
         {"GetFriendList", Purpose::GetFriendList},
         {"SaveGroupChatHistory", Purpose::SaveGroupChatHistory},
         {"GetGroupChatHistory", Purpose::GetGroupChatHistory},
+        {"AddGroup", Purpose::AddGroup},
+        {"GetGroupLeader", Purpose::GetGroupLeader},
 
         /* 子线程间的通信 */
         {"RefreshFriendList", Purpose::RefreshFriendList},
@@ -289,14 +291,63 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
         case Purpose::SaveGroupChatHistory: {
             /* 云缓存+转发聊天记录 */
             QString groupNumber = doc["GroupNumber"].toString();
+            QString accountNumber = doc["AccountNumber"].toString();
             /* 云缓存 */
             QJsonArray data = getGroupChatHistory(groupNumber);
             QJsonValue newChatData = doc["ChatHistory"];
             data.append(newChatData);
             settings->setValue(groupNumber+"/ChatHistory",
                                data);
-            /* 转发 */
-            //
+
+            /* 群聊好友列表 */
+            QJsonArray _friendList = getFriendArray(groupNumber);
+            QVariantList friendList = _friendList.toVariantList();
+            /* 转发内容 */
+            QJsonObject json;
+            json.insert("Purpose", "TransmitMsg");
+            QJsonObject msg = doc["ChatHistory"].toObject();
+            json.insert("Msg", msg);
+            json.insert("SendPerson", groupNumber);  //发送人(对应群)
+            QJsonDocument _doc(json);
+            QByteArray send_Data = _doc.toJson();
+            /* 转发(遍历) */
+            for (auto _oneFriend : friendList) {
+                QString oneFriend = _oneFriend.toString();
+                if (oneFriend == accountNumber) continue;  //不转发当前用户
+                /* 判断是否在线 */
+                if (accountNumberMap.find(oneFriend) == accountNumberMap.end()) {
+                    /* 不在线 */
+                    return;
+                }
+                /* 获取所在线程 */
+                int atSubThread = accountNumberMap.value(oneFriend);
+                if (atSubThread == ID) {
+                    /* 位于当前线程 */
+                    accountSocketsMap.value(oneFriend)->write(send_Data);  //同上
+                } else {
+                    /* 位于其他线程 */
+                    /* 把任务发送到对应的线程执行 */
+                    json.insert("AccountNumber", oneFriend);  //转发对象
+                    json.insert("SubThread", ID);
+                    QJsonDocument _doc(json);
+                    switch (atSubThread) {
+                    case 1: {
+                        emit toSubThread1_SendMsg(_doc);
+                        break;
+                    }
+                    case 2: {
+                        emit toSubThread2_SendMsg(_doc);
+                        break;
+                    }
+                    case 3: {
+                        emit toSubThread3_SendMsg(_doc);
+                        break;
+                    }
+                    default:
+                        break;
+                    }
+                }
+            }
             break;
         }
         case Purpose::GetGroupChatHistory: {
@@ -307,6 +358,24 @@ void MyThread::addOneSocket(qintptr socketDescriptor)
             QJsonObject json;
             json.insert("Purpose", "GetGroupChatHistory");  //目的
             json.insert("ChatHistory", chatHistory);  //聊天记录
+            QJsonDocument _doc(json);
+            QByteArray send_Data = _doc.toJson();
+
+            socket->write(send_Data);
+            break;
+        }
+        case Purpose::AddGroup: {
+            saveGroupData(doc);
+            qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
+                     << "好友信息存入完成";
+            break;
+        }
+        case Purpose::GetGroupLeader: {
+            QString groupNumber = doc["GroupNumber"].toString();
+            QString groupLeader = getGroupLeader(groupNumber);
+            QJsonObject json;
+            json.insert("Purpose", "GetGroupLeader");  //目的
+            json.insert("GroupLeader", groupLeader);
             QJsonDocument _doc(json);
             QByteArray send_Data = _doc.toJson();
 
@@ -558,6 +627,49 @@ QJsonArray MyThread::getGroupChatHistory(const QString &groupNumber)
     return data;
 }
 
+void MyThread::saveGroupData(const QJsonDocument &doc)
+{
+    QString accountNumber = doc["AccountNumber"].toString();
+    QString groupNumber = doc["GroupNumber"].toString();
+    /* 双向加好友 */
+    /* 1 群聊 */
+    /* 聊天记录先取再存 */
+    QJsonArray data = getGroupChatHistory(groupNumber);
+    QJsonValue newChatData = doc["ChatHistory"];
+    data.append(newChatData);
+    settings->setValue(groupNumber+"/ChatHistory",
+                       data);
+
+    /* NameArray先取再存 */
+    data = getFriendArray(groupNumber);
+    data.append(accountNumber);
+    settings->setValue(groupNumber+"/FriendList/NameArray",
+                       data);  //好友列表Array格式
+    /* 2 用户 */
+    /* NameArray先取再存 */
+    data = getFriendArray(accountNumber);
+    data.append(groupNumber);
+    settings->setValue(accountNumber+"/FriendList/NameArray",
+                       data);  //好友列表Array格式
+    /* 刷新当前用户 */
+    QJsonObject json;
+    json.insert("Purpose", "RefreshFriendList");  //目的
+    QJsonArray friendArray = getFriendArray(accountNumber);  //好友列表
+    json.insert("FriendArray", friendArray);
+    QJsonDocument _doc(json);
+    QByteArray send_Data = _doc.toJson();
+    accountSocketsMap.value(accountNumber)->write(send_Data);//发送存在的信息
+}
+
+QString MyThread::getGroupLeader(const QString &groupNumber)
+{
+    settings->beginGroup(groupNumber);  //进入目录
+    QString data = settings->value("GroupLeader").toString();
+    settings->endGroup();               //退出目录
+
+    return data;
+}
+
 void MyThread::onPrintThreadStart()
 {
     qDebug() << "子线程"+QString::number(ID) << QThread::currentThread() << ":"
@@ -640,6 +752,9 @@ void MyThread::onFinished_CheckGroupNumber(MySocket *socket, const QJsonDocument
         data.append(accountNumber);
         settings->setValue(groupNumber+"/FriendList/NameArray",
                            data);  //好友列表Array格式
+        /* 群聊设置群主 */
+        settings->setValue(groupNumber+"/GroupLeader",
+                           accountNumber);
 
         /* 当前用户刷新好友列表 */
         QJsonObject json;

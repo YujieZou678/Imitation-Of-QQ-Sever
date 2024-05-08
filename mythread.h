@@ -33,6 +33,8 @@ public:
     QJsonArray getFriendChatHistory(const QString&, const QString&);//获取聊天记录
     QJsonArray getFriendArray(const QString&);                //获取好友列表
     QJsonArray getGroupChatHistory(const QString&);           //获取群聊天记录
+    void saveGroupData(const QJsonDocument&);                 //加群聊
+    QString getGroupLeader(const QString&);                   //获取群主
 
     int socketCount{0};   //当前正在管理的socket数量
     int ID;               //属于第几个线程
@@ -75,6 +77,8 @@ private:
         GetFriendList,
         SaveGroupChatHistory,
         GetGroupChatHistory,
+        AddGroup,
+        GetGroupLeader,
 
         /* 子线程间的通信 */
         RefreshFriendList,
